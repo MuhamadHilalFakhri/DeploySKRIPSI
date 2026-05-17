@@ -1,4 +1,4 @@
-﻿import { FileText, User, Calendar, Tag, AlertCircle, Clock, ArrowRight, Eye, Download } from 'lucide-react';
+import { FileText, User, Calendar, Tag, AlertCircle, Clock, ArrowRight, Eye, Download } from 'lucide-react';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -106,6 +106,32 @@ export default function LetterDetailDialog({
                             {letter.content}
                         </div>
                     </div>
+
+                    {/* Disposition Info */}
+                    {letter.dispositionNote && (
+                        <div className="space-y-2">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block">Catatan Disposisi</span>
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                {letter.dispositionNote}
+                            </div>
+                            {(letter.disposedAt || letter.disposedBy) && (
+                                <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                                    {letter.disposedAt && (
+                                        <span className="flex items-center gap-1.5">
+                                            <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                            Tanggal Disposisi: <span className="font-medium text-slate-700">{letter.disposedAt}</span>
+                                        </span>
+                                    )}
+                                    {letter.disposedBy && (
+                                        <span className="flex items-center gap-1.5">
+                                            <User className="h-3.5 w-3.5 text-slate-400" />
+                                            Diproses oleh: <span className="font-medium text-slate-700">{letter.disposedBy}</span>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Attachment Section */}
                     {letter.attachment && (

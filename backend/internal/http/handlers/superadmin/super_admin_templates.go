@@ -729,7 +729,7 @@ func templatePreviewReplacements() map[string]string {
 		"{{isi_surat}}":         "Sehubungan dengan rencana sinergi antara PT. Lintas Data Prima dan pihak Government and Partner, kami mengundang Bapak/Ibu untuk mendiskusikan peluang kolaborasi, ruang lingkup kerja sama, serta rencana tindak lanjut yang dapat memberikan nilai tambah bagi kedua belah pihak.\n\nWaktu pelaksanaan dan detail agenda dapat disesuaikan dengan ketersediaan pihak terkait. Template ini dapat dipakai ulang untuk surat undangan, nota dinas, surat pengantar, maupun disposisi internal hanya dengan mengganti metadata dan isi utama surat.",
 		"{{prioritas}}":         "High",
 		"{{catatan_disposisi}}": "OK, lanjutkan ke Government and Partner untuk koordinasi agenda dan tindak lanjut awal.",
-		"{{tanggal_disposisi}}": "-",
+		"{{tanggal_disposisi}}": "07 Feb 2026 14:30",
 		"{{oleh}}":              "HR Admin",
 	}
 
@@ -1335,19 +1335,39 @@ func drawModernLetterPDF(pdf *gofpdf.Fpdf, logoPath string, data modernLetterPre
 
 	pdf.SetY(dispositionY + dispositionHeight + 5)
 	if len(data.FooterLines) > 0 {
-		ensurePDFSpace(pdf, 12)
+		leftFooterWidth := contentWidth * 0.66
+		rightFooterWidth := contentWidth - leftFooterWidth - 4
+		leftFooterText := firstNonEmptyText(data.FooterLines[0], "-")
+		rightFooterText := ""
+		if len(data.FooterLines) > 1 {
+			rightFooterText = strings.Join(data.FooterLines[1:], "\n")
+		}
+		leftFooterHeight := measurePDFTextHeight(pdf, leftFooterText, leftFooterWidth, 4)
+		rightFooterHeight := 0.0
+		if strings.TrimSpace(rightFooterText) != "" {
+			rightFooterHeight = measurePDFTextHeight(pdf, rightFooterText, rightFooterWidth, 4)
+		}
+		footerHeight := leftFooterHeight
+		if rightFooterHeight > footerHeight {
+			footerHeight = rightFooterHeight
+		}
+		if footerHeight < 4 {
+			footerHeight = 4
+		}
+		ensurePDFSpace(pdf, footerHeight+8)
+		footerTop := pdf.GetY()
 		pdf.SetDrawColor(217, 224, 234)
-		pdf.Line(left, pdf.GetY(), pageWidth-right, pdf.GetY())
+		pdf.Line(left, footerTop, pageWidth-right, footerTop)
 		pdf.Ln(4)
+		footerTextY := pdf.GetY()
 		pdf.SetFont("Arial", "B", 8.5)
 		pdf.SetTextColor(52, 64, 84)
-		pdf.CellFormat(contentWidth*0.62, 4, data.FooterLines[0], "", 0, "L", false, 0, "")
+		pdf.SetXY(left, footerTextY)
+		pdf.MultiCell(leftFooterWidth, 4, leftFooterText, "", "L", false)
 		pdf.SetFont("Arial", "", 8.5)
 		pdf.SetTextColor(102, 112, 133)
-		remainingFooter := ""
-		if len(data.FooterLines) > 1 {
-			remainingFooter = strings.Join(data.FooterLines[1:], "\n")
-		}
-		pdf.MultiCell(contentWidth-(contentWidth*0.62), 4, remainingFooter, "", "R", false)
+		pdf.SetXY(left+leftFooterWidth+4, footerTextY)
+		pdf.MultiCell(rightFooterWidth, 4, rightFooterText, "", "R", false)
+		pdf.SetY(footerTextY + footerHeight)
 	}
 }

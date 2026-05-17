@@ -155,9 +155,7 @@ func AdminStaffLettersStore(c *gin.Context) {
 	if strings.TrimSpace(perihal) == "" {
 		validationErrors["perihal"] = "Perihal wajib diisi."
 	}
-	if strings.TrimSpace(isiSurat) == "" {
-		validationErrors["isi_surat"] = "Isi surat wajib diisi."
-	}
+
 	if strings.TrimSpace(kategori) == "" {
 		validationErrors["kategori"] = "Kategori wajib diisi."
 	}
@@ -184,19 +182,17 @@ func AdminStaffLettersStore(c *gin.Context) {
 	var attachmentName *string
 	var attachmentMime *string
 	var attachmentSize *int64
-	if _, err := c.FormFile("lampiran"); err != nil {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran wajib diunggah."})
-		return
+	if _, err := c.FormFile("lampiran"); err == nil {
+		path, meta, saveErr := handlers.SaveValidatedUploadedFile(c, "lampiran", "letters", handlers.DocumentUploadRules())
+		if saveErr != nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran harus berupa PDF, DOC, atau DOCX dengan ukuran maksimal 5MB."})
+			return
+		}
+		attachmentPath = &path
+		attachmentName = &meta.OriginalName
+		attachmentMime = &meta.Mime
+		attachmentSize = &meta.Size
 	}
-	path, meta, err := handlers.SaveValidatedUploadedFile(c, "lampiran", "letters", handlers.DocumentUploadRules())
-	if err != nil {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran harus berupa PDF, DOC, atau DOCX dengan ukuran maksimal 5MB."})
-		return
-	}
-	attachmentPath = &path
-	attachmentName = &meta.OriginalName
-	attachmentMime = &meta.Mime
-	attachmentSize = &meta.Size
 
 	now := time.Now()
 	for _, target := range targetDivisions {

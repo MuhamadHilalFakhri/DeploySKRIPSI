@@ -1,4 +1,4 @@
-﻿import { Upload, X } from 'lucide-react';
+import { Upload, X } from 'lucide-react';
 import { ChangeEvent, useMemo } from 'react';
 import { toast } from 'sonner';
 
@@ -329,9 +329,7 @@ export default function ComposeLetterDialog({
                     </div>
 
                     <div>
-                        <Label>
-                            Isi Surat <span className="text-red-500">*</span>
-                        </Label>
+                        <Label>Isi Surat (Opsional)</Label>
                         <Textarea
                             rows={8}
                             placeholder="Tulis isi surat di sini..."

@@ -1,4 +1,4 @@
-﻿import { Upload, X } from 'lucide-react';
+import { Upload, X } from 'lucide-react';
 import { ChangeEvent, useMemo } from 'react';
 import { toast } from 'sonner';
 
@@ -343,9 +343,7 @@ export default function ComposeLetterDialog({
                     </div>
 
                     <div>
-                        <Label>
-                            Lampiran (Wajib - PDF atau Word, max 5MB) <span className="text-red-500">*</span>
-                        </Label>
+                        <Label>Lampiran (Opsional - PDF atau Word, max 5MB)</Label>
                         <label
                             htmlFor="lampiran"
                             className="mt-2 block cursor-pointer rounded-lg border-2 border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 transition hover:border-blue-500 hover:text-blue-600"
@@ -358,7 +356,7 @@ export default function ComposeLetterDialog({
                             type="file"
                             accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             className="hidden"
-                            required
+
                             onChange={handleAttachmentChange}
                         />
                         {data.lampiran && (

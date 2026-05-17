@@ -377,16 +377,19 @@ func SuperAdminLettersFinalDisposition(c *gin.Context) {
 			continue
 		}
 
+		now := time.Now()
 		if note != "" {
 			surat.DispositionNote = &note
 		}
+		surat.DisposedAt = &now
+		surat.DisposedBy = &user.ID
 
 		filePath, fileName := generateDispositionFinalPDFDocument(c, db, surat, selectedTemplateID)
 		if strings.TrimSpace(filePath) == "" || strings.TrimSpace(fileName) == "" {
 			handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat lampiran PDF disposisi final.")
 			return
 		}
-		_ = dbrepo.UpdateSuratFinalDisposition(db, surat.SuratID, &filePath, &fileName, surat.DispositionNote, user.ID, time.Now())
+		_ = dbrepo.UpdateSuratFinalDisposition(db, surat.SuratID, &filePath, &fileName, surat.DispositionNote, user.ID, now)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": fmt.Sprintf("%d surat didisposisi final.", len(ids))})
