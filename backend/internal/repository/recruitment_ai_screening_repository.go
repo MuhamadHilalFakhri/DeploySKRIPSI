@@ -180,6 +180,38 @@ func GetLatestRecruitmentAIScreeningsByApplicationIDs(db *sqlx.DB, applicationID
 	return out, nil
 }
 
+func GetLatestSuccessfulRecruitmentAIScreeningsByApplicationIDs(db *sqlx.DB, applicationIDs []int64) (map[int64]models.RecruitmentAIScreening, error) {
+	out := make(map[int64]models.RecruitmentAIScreening, len(applicationIDs))
+	if db == nil || len(applicationIDs) == 0 {
+		return out, nil
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT s.*
+		FROM recruitment_ai_screenings s
+		INNER JOIN (
+			SELECT application_id, MAX(id) AS latest_id
+			FROM recruitment_ai_screenings
+			WHERE application_id IN (?)
+			  AND status = 'success'
+			GROUP BY application_id
+		) latest ON latest.latest_id = s.id
+	`, applicationIDs)
+	if err != nil {
+		return out, wrapRepoErr("build latest successful ai screening query", err)
+	}
+	query = db.Rebind(query)
+
+	rows := []models.RecruitmentAIScreening{}
+	if err := db.Select(&rows, query, args...); err != nil {
+		return out, wrapRepoErr("get latest successful ai screenings by application ids", err)
+	}
+	for _, row := range rows {
+		out[row.ApplicationID] = row
+	}
+	return out, nil
+}
+
 func GetLatestRecruitmentAIScreeningByApplicationID(db *sqlx.DB, applicationID int64) (*models.RecruitmentAIScreening, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
@@ -197,6 +229,28 @@ func GetLatestRecruitmentAIScreeningByApplicationID(db *sqlx.DB, applicationID i
 			return nil, nil
 		}
 		return nil, wrapRepoErr("get latest ai screening by application id", err)
+	}
+	return &row, nil
+}
+
+func GetLatestSuccessfulRecruitmentAIScreeningByApplicationID(db *sqlx.DB, applicationID int64) (*models.RecruitmentAIScreening, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	var row models.RecruitmentAIScreening
+	err := db.Get(&row, `
+		SELECT *
+		FROM recruitment_ai_screenings
+		WHERE application_id = ?
+		  AND status = 'success'
+		ORDER BY id DESC
+		LIMIT 1
+	`, applicationID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapRepoErr("get latest successful ai screening by application id", err)
 	}
 	return &row, nil
 }

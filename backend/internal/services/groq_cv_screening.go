@@ -18,14 +18,14 @@ import (
 const (
 	maxCVPromptChars              = 9000
 	maxPromptRequirements         = 8
-	defaultGroqRequestTimeout     = 60 * time.Second
+	defaultGroqRequestTimeout     = 120 * time.Second
 	baseGroqRetryDelay            = 500 * time.Millisecond
 	maxGroqRetryDelay             = 4 * time.Second
-	maxGroqModelAttempts          = 2
-	screeningMaxTokensDefault     = 800
-	screeningMaxTokensReasoning   = 4096
-	repairMaxTokensDefault        = 420
-	repairMaxTokensReasoning      = 1200
+	maxGroqModelAttempts          = 3
+	screeningMaxTokensDefault     = 1024
+	screeningMaxTokensReasoning   = 8192
+	repairMaxTokensDefault        = 512
+	repairMaxTokensReasoning      = 2048
 )
 
 var promptInjectionPattern = regexp.MustCompile("(?i)(ignore\\s+all\\s+previous\\s+instructions|ignore\\s+previous\\s+instructions|disregard\\s+previous\\s+instructions|system\\s+prompt|developer\\s+message|<\\s*system\\s*>|<\\s*/\\s*system\\s*>|`{3,})")
@@ -752,7 +752,12 @@ func parseGroqChatCompletion(rawBody []byte) (string, CVScreeningTokenUsage, err
 
 	content := strings.TrimSpace(parsed.Choices[0].Message.Content)
 	if content == "" {
-		return "", CVScreeningTokenUsage{}, errors.New("konten respons model kosong")
+		// Reasoning models sometimes return empty content when token budget
+		// is exhausted during internal chain-of-thought. Treat as retryable error.
+		return "", CVScreeningTokenUsage{}, &groqAPIError{
+			StatusCode: http.StatusBadRequest,
+			Message:    "konten respons model kosong (token habis atau reasoning overflow)",
+		}
 	}
 	return content, parsed.Usage, nil
 }
@@ -890,7 +895,12 @@ func shouldRetryScreening(err error) bool {
 		if apiErr.StatusCode == http.StatusTooManyRequests || apiErr.StatusCode >= http.StatusInternalServerError {
 			return true
 		}
-		return apiErr.StatusCode == http.StatusBadRequest && isGroqJSONValidationError(apiErr.Message)
+		// Empty response or JSON validation errors from model are retryable
+		if apiErr.StatusCode == http.StatusBadRequest {
+			return isGroqJSONValidationError(apiErr.Message) ||
+				strings.Contains(strings.ToLower(apiErr.Message), "konten respons model kosong")
+		}
+		return false
 	}
 	return true
 }

@@ -373,9 +373,9 @@ func runRecruitmentAIWorkerLoop(db *sqlx.DB, cfg config.Config) {
 
 		timeoutSec := cfg.GroqRequestTimeoutSec
 		if timeoutSec <= 0 {
-			timeoutSec = 60
+			timeoutSec = 120
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec+20)*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec+30)*time.Second)
 		output, runErr := runRecruitmentAIScreeningForApplication(ctx, db, cfg, payload.ApplicationID, payload.ActorUserID)
 		cancel()
 
@@ -414,6 +414,11 @@ func runRecruitmentAIWorkerLoop(db *sqlx.DB, cfg config.Config) {
 func enqueueRecruitmentAIScreeningJob(db *sqlx.DB, applicationID, actorUserID int64, delay time.Duration) {
 	if db == nil || applicationID <= 0 {
 		return
+	}
+	if existing, err := dbrepo.FindQueuedApplicationJobIndex(db, recruitmentAIScreeningQueueName, []int64{applicationID}); err == nil {
+		if existingJob, ok := existing[applicationID]; ok && existingJob.ID > 0 {
+			return
+		}
 	}
 	payload := recruitmentAIScreeningJobPayload{
 		ApplicationID: applicationID,
@@ -492,18 +497,29 @@ func loadLatestRecruitmentAIScreeningsIndex(db *sqlx.DB, applicationIDs []int64)
 	if err != nil {
 		return out
 	}
+	successRows, _ := dbrepo.GetLatestSuccessfulRecruitmentAIScreeningsByApplicationIDs(db, applicationIDs)
 	jobIndex, _ := dbrepo.FindQueuedApplicationJobIndex(db, recruitmentAIScreeningQueueName, applicationIDs)
 
 	for _, appID := range applicationIDs {
 		row, ok := rows[appID]
 		if !ok {
+			if successRow, hasSuccess := successRows[appID]; hasSuccess {
+				clonedSuccess := successRow
+				out[appID] = mapAIScreeningPayloadWithJob(&clonedSuccess, jobIndex[appID])
+				continue
+			}
 			if job, hasJob := jobIndex[appID]; hasJob {
 				out[appID] = synthesizeQueuedAIScreeningPayload(appID, job, "")
 			}
 			continue
 		}
-		cloned := row
-		out[appID] = mapAIScreeningPayloadWithJob(&cloned, jobIndex[appID])
+		var successRowPtr *models.RecruitmentAIScreening
+		if successRow, hasSuccess := successRows[appID]; hasSuccess {
+			clonedSuccess := successRow
+			successRowPtr = &clonedSuccess
+		}
+		effectiveRow := buildEffectiveAIScreeningRow(&row, successRowPtr)
+		out[appID] = mapAIScreeningPayloadWithJob(effectiveRow, jobIndex[appID])
 	}
 	return out
 }
@@ -518,7 +534,15 @@ func loadLatestRecruitmentAIScreening(db *sqlx.DB, applicationID string) (*model
 		return nil, errors.New("id lamaran tidak valid")
 	}
 
-	return dbrepo.GetLatestRecruitmentAIScreeningByApplicationID(db, parsedID)
+	latestRow, err := dbrepo.GetLatestRecruitmentAIScreeningByApplicationID(db, parsedID)
+	if err != nil {
+		return nil, err
+	}
+	successRow, successErr := dbrepo.GetLatestSuccessfulRecruitmentAIScreeningByApplicationID(db, parsedID)
+	if successErr != nil {
+		return nil, successErr
+	}
+	return buildEffectiveAIScreeningRow(latestRow, successRow), nil
 }
 
 func loadSameApplicationAIScreeningMemory(db *sqlx.DB, app models.Application) []services.CVScreeningMemoryEntry {
@@ -735,6 +759,71 @@ func mapAIScreeningPayloadWithJob(row *models.RecruitmentAIScreening, job dbrepo
 	}
 }
 
+func buildEffectiveAIScreeningRow(
+	latestRow *models.RecruitmentAIScreening,
+	latestSuccessRow *models.RecruitmentAIScreening,
+) *models.RecruitmentAIScreening {
+	if latestRow == nil {
+		if latestSuccessRow == nil {
+			return nil
+		}
+		cloned := *latestSuccessRow
+		return &cloned
+	}
+	if strings.EqualFold(strings.TrimSpace(latestRow.Status), "success") || latestSuccessRow == nil {
+		cloned := *latestRow
+		return &cloned
+	}
+
+	merged := *latestRow
+	if merged.ModelUsed == nil || strings.TrimSpace(handlers.FirstString(merged.ModelUsed, "")) == "" {
+		merged.ModelUsed = latestSuccessRow.ModelUsed
+	}
+	if len(merged.ModelChain) == 0 {
+		merged.ModelChain = latestSuccessRow.ModelChain
+	}
+	if strings.TrimSpace(merged.PromptVersion) == "" {
+		merged.PromptVersion = latestSuccessRow.PromptVersion
+	}
+	if merged.CVFilePath == nil || strings.TrimSpace(handlers.FirstString(merged.CVFilePath, "")) == "" {
+		merged.CVFilePath = latestSuccessRow.CVFilePath
+	}
+	if merged.CVTextChars <= 0 {
+		merged.CVTextChars = latestSuccessRow.CVTextChars
+	}
+	if merged.MatchScore == nil {
+		merged.MatchScore = latestSuccessRow.MatchScore
+	}
+	if merged.Recommendation == nil || strings.TrimSpace(handlers.FirstString(merged.Recommendation, "")) == "" {
+		merged.Recommendation = latestSuccessRow.Recommendation
+	}
+	if merged.Summary == nil || strings.TrimSpace(handlers.FirstString(merged.Summary, "")) == "" {
+		merged.Summary = latestSuccessRow.Summary
+	}
+	if len(merged.StrengthsJSON) == 0 {
+		merged.StrengthsJSON = latestSuccessRow.StrengthsJSON
+	}
+	if len(merged.GapsJSON) == 0 {
+		merged.GapsJSON = latestSuccessRow.GapsJSON
+	}
+	if len(merged.RedFlagsJSON) == 0 {
+		merged.RedFlagsJSON = latestSuccessRow.RedFlagsJSON
+	}
+	if len(merged.InterviewQuestionsJSON) == 0 {
+		merged.InterviewQuestionsJSON = latestSuccessRow.InterviewQuestionsJSON
+	}
+	if merged.TokenPrompt <= 0 {
+		merged.TokenPrompt = latestSuccessRow.TokenPrompt
+	}
+	if merged.TokenCompletion <= 0 {
+		merged.TokenCompletion = latestSuccessRow.TokenCompletion
+	}
+	if merged.TokenTotal <= 0 {
+		merged.TokenTotal = latestSuccessRow.TokenTotal
+	}
+	return &merged
+}
+
 func persistRecruitmentAIScreeningProviderFailure(db *sqlx.DB, applicationID, actorUserID int64, err error) {
 	if db == nil || applicationID <= 0 || !errors.Is(err, errAIScreeningProviderFailed) {
 		return
@@ -780,7 +869,7 @@ func queuedAIScreeningStatusMessage(status string, rawError string) string {
 		}
 		return "Screening CV sedang dicoba ulang otomatis."
 	case "processing":
-		return "Screening CV sedang diproses dengan model gpt-oss-120b."
+		return "Screening CV sedang diproses dengan AI."
 	default:
 		return humanizeRecruitmentAIScreeningErrorMessage(rawError)
 	}
@@ -792,8 +881,8 @@ func synthesizeQueuedAIScreeningPayload(applicationID int64, job dbrepo.JobRecor
 		"id":                  nil,
 		"application_id":      applicationID,
 		"provider":            "groq",
-		"model_used":          "openai/gpt-oss-120b",
-		"model_chain":         []string{"openai/gpt-oss-120b"},
+		"model_used":          nil,
+		"model_chain":         []string{},
 		"prompt_version":      nil,
 		"cv_file_path":        nil,
 		"cv_text_chars":       0,
