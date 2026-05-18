@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"encoding/json"
+	"hris-backend/internal/dto"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -246,7 +247,24 @@ certificationsSection:
 	}
 
 	if shouldSyncUserAccount {
-		_ = dbrepo.UpdateUserNameEmailByID(db, user.ID, profile.FullName, profile.Email)
+		nextEmail := handlers.NormalizeEmail(handlers.FirstString(profile.Email, user.Email))
+		exists, err := dbrepo.UserEmailExists(db, nextEmail, &user.ID)
+		if err != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memvalidasi email")
+			return
+		}
+		if exists {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"personal.email": "Email sudah digunakan."})
+			return
+		}
+
+		if err := dbrepo.UpdateUserNameEmailByID(db, user.ID, profile.FullName, profile.Email); err != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui akun pengguna")
+			return
+		}
+
+		user.Name = handlers.FirstString(profile.FullName, user.Name)
+		user.Email = nextEmail
 	}
 
 	syncCompletion(profile)
@@ -255,7 +273,11 @@ certificationsSection:
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "Profil berhasil diperbarui."})
+	c.JSON(http.StatusOK, gin.H{
+		"status":            "Profil berhasil diperbarui.",
+		"user":              dto.UserFromModel(user),
+		"profile_photo_url": handlers.AttachmentURL(c, profile.ProfilePhotoPath),
+	})
 }
 
 func getApplicantProfile(db *sqlx.DB, userID int64) *models.ApplicantProfile {
