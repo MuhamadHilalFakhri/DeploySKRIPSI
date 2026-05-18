@@ -18,14 +18,14 @@ import (
 const (
 	maxCVPromptChars              = 9000
 	maxPromptRequirements         = 8
-	defaultGroqRequestTimeout     = 120 * time.Second
+	defaultGroqRequestTimeout     = 60 * time.Second
 	baseGroqRetryDelay            = 500 * time.Millisecond
 	maxGroqRetryDelay             = 4 * time.Second
-	maxGroqModelAttempts          = 3
+	maxGroqModelAttempts          = 2
 	screeningMaxTokensDefault     = 1024
-	screeningMaxTokensReasoning   = 8192
+	screeningMaxTokensReasoning   = 2048
 	repairMaxTokensDefault        = 512
-	repairMaxTokensReasoning      = 2048
+	repairMaxTokensReasoning      = 768
 )
 
 var promptInjectionPattern = regexp.MustCompile("(?i)(ignore\\s+all\\s+previous\\s+instructions|ignore\\s+previous\\s+instructions|disregard\\s+previous\\s+instructions|system\\s+prompt|developer\\s+message|<\\s*system\\s*>|<\\s*/\\s*system\\s*>|`{3,})")
