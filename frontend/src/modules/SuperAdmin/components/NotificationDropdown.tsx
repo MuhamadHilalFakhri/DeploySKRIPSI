@@ -24,7 +24,7 @@ import { cn } from '@/shared/lib/utils';
 
 interface NotificationItem {
   id: string;
-  type: 'letter' | 'application' | 'termination' | 'complaint' | 'audit';
+  type: 'letter' | 'application' | 'termination' | 'complaint' | 'audit' | 'vacancy_approval';
   title: string;
   description: string;
   timestamp: string;
@@ -50,6 +50,7 @@ const iconMap: Record<string, React.ElementType> = {
   termination: UserMinus,
   complaint: MessageCircle,
   audit: ClipboardList,
+  vacancy_approval: ClipboardList,
 };
 
 const colorMap: Record<string, string> = {
@@ -58,6 +59,7 @@ const colorMap: Record<string, string> = {
   termination: 'bg-orange-100 text-orange-600',
   complaint: 'bg-rose-100 text-rose-600',
   audit: 'bg-amber-100 text-amber-700',
+  vacancy_approval: 'bg-amber-100 text-amber-700',
 };
 
 export default function NotificationDropdown({

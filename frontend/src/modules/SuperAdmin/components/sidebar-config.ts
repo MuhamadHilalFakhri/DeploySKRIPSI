@@ -103,3 +103,4 @@ export const defaultNavItems: NavItem[] = [
 
 export const pendingStatuses = ['Menunggu HR', 'Diajukan', 'Diproses'];
 export const lettersBadgeKey = 'super-admin.letters.index';
+export const divisionsApprovalBadgeKey = 'super-admin.divisions.index';

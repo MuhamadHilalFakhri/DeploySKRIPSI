@@ -40,6 +40,20 @@ func CountPendingRecruitmentApplications(db *sqlx.DB) (int, error) {
 	return count, wrapRepoErr("count pending recruitment applications", err)
 }
 
+func CountPendingDivisionJobApprovals(db *sqlx.DB) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	var count int
+	err := db.Get(&count, `
+		SELECT COUNT(*)
+		FROM division_jobs
+		WHERE is_active = 1
+		  AND workflow_status = 'pending_approval'
+	`)
+	return count, wrapRepoErr("count pending division job approvals", err)
+}
+
 func CountPendingStaffTerminations(db *sqlx.DB) (int, error) {
 	if db == nil {
 		return 0, errors.New("database tidak tersedia")
@@ -195,6 +209,35 @@ func ListPendingRecruitmentApplicationsPaged(db *sqlx.DB, limit, offset int) ([]
 		LIMIT ? OFFSET ?
 	`, limit, offset)
 	return rows, wrapRepoErr("list pending recruitment applications paged", err)
+}
+
+func ListPendingDivisionJobApprovalNotificationsPaged(db *sqlx.DB, limit, offset int) ([]NotificationRow, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []NotificationRow{}
+	err := db.Select(&rows, `
+		SELECT
+			CONCAT('vacancy-approval-', dj.id) AS id,
+			'vacancy_approval' AS type,
+			'Approval Lowongan Baru' AS title,
+			CONCAT(COALESCE(dp.name, 'Divisi'), ' mengajukan lowongan ', COALESCE(NULLIF(dj.job_title, ''), 'tanpa judul')) AS description,
+			'/super-admin/kelola-divisi' AS url,
+			COALESCE(dj.submitted_at, dj.updated_at, dj.created_at) AS created_at
+		FROM division_jobs dj
+		LEFT JOIN division_profiles dp ON dp.id = dj.division_profile_id
+		WHERE dj.is_active = 1
+		  AND dj.workflow_status = 'pending_approval'
+		ORDER BY COALESCE(dj.submitted_at, dj.updated_at, dj.created_at) DESC, dj.id DESC
+		LIMIT ? OFFSET ?
+	`, limit, offset)
+	return rows, wrapRepoErr("list pending division job approval notifications paged", err)
 }
 
 func ListPendingStaffTerminationsPaged(db *sqlx.DB, limit, offset int) ([]models.StaffTermination, error) {

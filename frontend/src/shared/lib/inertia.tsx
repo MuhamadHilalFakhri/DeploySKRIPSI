@@ -5,7 +5,7 @@ import React, { useCallback, useContext, useEffect, useMemo, useState } from 're
 
 import { api, apiUrl } from '@/shared/lib/api';
 import { setCurrentRouteName } from '@/shared/lib/route';
-import { canAccessHumanCapitalOperations } from '@/shared/lib/user-roles';
+import { canAccessVacancyWorkflow } from '@/shared/lib/user-roles';
 
 import { PageContext } from './inertia-context';
 import { useForm } from './inertia-form';
@@ -212,7 +212,7 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const user = props?.auth?.user;
-    if (!canAccessHumanCapitalOperations(user)) {
+    if (!canAccessVacancyWorkflow(user)) {
       return;
     }
 
@@ -226,6 +226,7 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         const counts: Record<string, number> = {
+          'super-admin.divisions.index': 0,
           'super-admin.letters.index': 0,
           'super-admin.recruitment': 0,
           'super-admin.staff.index': 0,
@@ -250,6 +251,9 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
             switch (item.type) {
               case 'letter':
                 counts['super-admin.letters.index'] += 1;
+                break;
+              case 'vacancy_approval':
+                counts['super-admin.divisions.index'] += 1;
                 break;
               case 'application':
                 counts['super-admin.recruitment'] += 1;

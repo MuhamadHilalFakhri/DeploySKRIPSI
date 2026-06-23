@@ -11,6 +11,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
     defaultNavItems,
+    divisionsApprovalBadgeKey,
     lettersBadgeKey,
     pendingStatuses,
 } from '@/modules/SuperAdmin/components/sidebar-config';
@@ -121,6 +122,7 @@ function Sidebar({
                         icon: LayoutDashboard,
                         routeName: 'super-admin.divisions.index',
                         pattern: 'super-admin.divisions.*',
+                        badgeKey: divisionsApprovalBadgeKey,
                     },
                 ];
             }

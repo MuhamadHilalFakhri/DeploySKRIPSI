@@ -154,7 +154,6 @@ function VacancyDetailDialog({
 }) {
     const criteria = job?.job_eligibility_criteria ?? {};
     const scoringWeights = criteria.scoring_weights;
-    const scoringThresholds = criteria.scoring_thresholds;
     const cleanRequirements = (job?.job_requirements ?? []).filter(
         (requirement) => requirement && requirement.trim() !== '',
     );
@@ -276,33 +275,21 @@ function VacancyDetailDialog({
                         </div>
                     </section>
 
-                    {(scoringWeights || scoringThresholds) && (
+                    {scoringWeights && (
                         <section className="space-y-2">
                             <h6 className="text-sm font-semibold text-slate-900">Pengaturan Scoring</h6>
-                            <div className="grid gap-3 lg:grid-cols-2">
-                                {scoringWeights && (
-                                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-                                        <p className="text-sm font-semibold text-indigo-900">Bobot Penilaian</p>
-                                        <div className="mt-3 grid gap-2 text-sm text-indigo-900">
-                                            {scoringWeights.education != null && <DetailInfoRow label="Education" value={`${scoringWeights.education}%`} />}
-                                            {scoringWeights.experience != null && <DetailInfoRow label="Experience" value={`${scoringWeights.experience}%`} />}
-                                            {scoringWeights.skills != null && <DetailInfoRow label="Skills" value={`${scoringWeights.skills}%`} />}
-                                            {scoringWeights.certification != null && <DetailInfoRow label="Certification" value={`${scoringWeights.certification}%`} />}
-                                            {scoringWeights.profile != null && <DetailInfoRow label="Profile" value={`${scoringWeights.profile}%`} />}
-                                            {scoringWeights.ai_screening != null && <DetailInfoRow label="AI Screening" value={`${scoringWeights.ai_screening}%`} />}
-                                        </div>
+                            <div className="grid gap-3">
+                                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                                    <p className="text-sm font-semibold text-indigo-900">Bobot Penilaian</p>
+                                    <div className="mt-3 grid gap-2 text-sm text-indigo-900">
+                                        {scoringWeights.education != null && <DetailInfoRow label="Education" value={`${scoringWeights.education}%`} />}
+                                        {scoringWeights.experience != null && <DetailInfoRow label="Experience" value={`${scoringWeights.experience}%`} />}
+                                        {scoringWeights.skills != null && <DetailInfoRow label="Skills" value={`${scoringWeights.skills}%`} />}
+                                        {scoringWeights.certification != null && <DetailInfoRow label="Certification" value={`${scoringWeights.certification}%`} />}
+                                        {scoringWeights.profile != null && <DetailInfoRow label="Profile" value={`${scoringWeights.profile}%`} />}
+                                        {scoringWeights.ai_screening != null && <DetailInfoRow label="AI Screening" value={`${scoringWeights.ai_screening}%`} />}
                                     </div>
-                                )}
-                                {scoringThresholds && (
-                                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                                        <p className="text-sm font-semibold text-blue-900">Threshold Rekomendasi</p>
-                                        <div className="mt-3 grid gap-2 text-sm text-blue-900">
-                                            {scoringThresholds.priority != null && <DetailInfoRow label="Priority" value={`${scoringThresholds.priority}%`} />}
-                                            {scoringThresholds.recommended != null && <DetailInfoRow label="Recommended" value={`${scoringThresholds.recommended}%`} />}
-                                            {scoringThresholds.consider != null && <DetailInfoRow label="Consider" value={`${scoringThresholds.consider}%`} />}
-                                        </div>
-                                    </div>
-                                )}
+                                </div>
                             </div>
                         </section>
                     )}

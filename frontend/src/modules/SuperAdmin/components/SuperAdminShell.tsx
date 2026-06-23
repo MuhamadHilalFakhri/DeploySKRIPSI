@@ -10,7 +10,7 @@ import { Button } from '@/shared/components/ui/button';
 import { api, apiUrl } from '@/shared/lib/api';
 import { usePage, usePageManager } from '@/shared/lib/inertia';
 import { consumeLoginSuccessToast } from '@/shared/lib/login-success-toast';
-import { canAccessHumanCapitalOperations, isManagerHCRole } from '@/shared/lib/user-roles';
+import { canAccessVacancyWorkflow, isManagerHCRole } from '@/shared/lib/user-roles';
 import { cn } from '@/shared/lib/utils';
 import { PageProps } from '@/shared/types';
 
@@ -73,7 +73,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
             return;
         }
 
-        if (!canAccessHumanCapitalOperations(user)) {
+        if (!canAccessVacancyWorkflow(user)) {
             return;
         }
 

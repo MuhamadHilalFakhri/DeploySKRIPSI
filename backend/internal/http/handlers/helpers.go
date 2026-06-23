@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
 )
 
@@ -163,6 +164,16 @@ func ComputeSuperAdminSidebarNotifications(db any, userID ...int64) map[string]i
 	sqlDB, ok := db.(*sqlx.DB)
 	if !ok {
 		return map[string]int{}
+	}
+
+	if len(userID) > 0 && userID[0] > 0 {
+		role, _ := dbrepo.GetUserRoleByID(sqlDB, userID[0])
+		if role == models.RoleManagerHC {
+			pendingApprovalCount, _ := dbrepo.CountPendingDivisionJobApprovals(sqlDB)
+			return map[string]int{
+				"super-admin.divisions.index": pendingApprovalCount,
+			}
+		}
 	}
 
 	notifications := map[string]int{}

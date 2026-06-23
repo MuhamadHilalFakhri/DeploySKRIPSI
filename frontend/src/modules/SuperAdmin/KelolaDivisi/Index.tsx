@@ -11,7 +11,7 @@ import { DivisionTabs } from './components/DivisionTabs';
 import { SummaryCards } from './components/SummaryCards';
 import CreateDivisionDialog, { CreateDivisionFormFields } from './Create';
 import EditDivisionDialog, { EditFormFields } from './Edit';
-import JobDialog, { JobFormFields } from './JobDialog';
+import JobDialog, { JobFormFields, formatSalaryInput } from './JobDialog';
 import {
     DivisionJob,
     DivisionRecord,
@@ -261,7 +261,7 @@ export default function KelolaDivisiIndex({
             job_id: job?.id ?? null,
             job_title: job?.job_title ?? '',
             job_description: job?.job_description ?? '',
-            job_salary_min: job?.job_salary_min ? String(job.job_salary_min) : '',
+            job_salary_min: formatSalaryInput(job?.job_salary_min),
             job_work_mode: job?.job_work_mode ?? '',
             job_requirements: cleanRequirements.length > 0 ? cleanRequirements : [''],
             job_eligibility_criteria: normalizeEligibilityCriteria(job?.job_eligibility_criteria),

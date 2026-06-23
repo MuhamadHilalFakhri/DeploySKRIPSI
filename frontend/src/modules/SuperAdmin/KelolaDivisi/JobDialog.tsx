@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
+import { toast } from 'sonner';
 
 import { EligibilityCriteriaSection } from '@/modules/SuperAdmin/KelolaDivisi/components/job-dialog/EligibilityCriteriaSection';
 import { ScoringConfigSection } from '@/modules/SuperAdmin/KelolaDivisi/components/job-dialog/ScoringConfigSection';
@@ -48,6 +49,15 @@ const DEFAULT_SCORING_THRESHOLDS = {
     recommended: 70,
     consider: 55,
 } as const;
+
+export function formatSalaryInput(value: string | number | null | undefined): string {
+    const digitsOnly = String(value ?? '').replace(/\D/g, '');
+    if (!digitsOnly) {
+        return '';
+    }
+
+    return new Intl.NumberFormat('id-ID').format(Number(digitsOnly));
+}
 
 function normalizeScoreValue(value: unknown, fallback: number): number {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -309,14 +319,14 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
         const salaryValue = Number(String(form.data.job_salary_min).replace(/\D/g, ''));
         if (!Number.isFinite(salaryValue) || salaryValue < MIN_JOB_SALARY) {
             form.setError('job_salary_min', 'Gaji minimal Rp 500.000.');
-            window.alert('Gaji minimal Rp 500.000.');
+            toast.error('Gaji minimal Rp 500.000.');
             return false;
         }
         form.clearErrors('job_salary_min');
 
         if (!WORK_MODE_OPTIONS.includes(form.data.job_work_mode as typeof WORK_MODE_OPTIONS[number])) {
             form.setError('job_work_mode', 'Pilih mode kerja WFO, WFA, atau Fleksibel.');
-            window.alert('Pilih mode kerja sebelum menyimpan.');
+            toast.error('Pilih mode kerja sebelum menyimpan.');
             return false;
         }
         form.clearErrors('job_work_mode');
@@ -328,7 +338,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
 
         if (nonEmptyRequirements.length === 0) {
             form.setError('job_requirements', 'Mohon tambahkan minimal satu persyaratan.');
-            window.alert('Mohon tambahkan minimal satu persyaratan sebelum menyimpan.');
+            toast.error('Mohon tambahkan minimal satu persyaratan sebelum menyimpan.');
             return false;
         }
 
@@ -414,15 +424,14 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                         </span>
                                         <Input
                                             id="job-salary"
-                                            type="number"
-                                            min={MIN_JOB_SALARY}
-                                            step={50000}
+                                            type="text"
+                                            inputMode="numeric"
                                             value={form.data.job_salary_min ?? ''}
                                             onChange={(event) => {
-                                                form.setData('job_salary_min', event.target.value);
+                                                form.setData('job_salary_min', formatSalaryInput(event.target.value));
                                                 form.clearErrors('job_salary_min');
                                             }}
-                                            placeholder="500000"
+                                            placeholder="500.000"
                                             className="border-0 focus-visible:ring-0"
                                         />
                                     </div>

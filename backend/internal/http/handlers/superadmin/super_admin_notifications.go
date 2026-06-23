@@ -15,6 +15,8 @@ import (
 
 type notificationsRepository interface {
 	ListUnifiedNotificationsPaged(userID int64, limit, offset int) ([]dbrepo.NotificationRow, error)
+	ListPendingDivisionJobApprovalNotificationsPaged(limit, offset int) ([]dbrepo.NotificationRow, error)
+	CountPendingDivisionJobApprovals() (int, error)
 	CountPendingHRLetters() (int, error)
 	CountPendingRecruitmentApplications() (int, error)
 	CountPendingStaffTerminations() (int, error)
@@ -32,6 +34,14 @@ func newNotificationsRepository(db *sqlx.DB) notificationsRepository {
 
 func (r *sqlNotificationsRepository) ListUnifiedNotificationsPaged(userID int64, limit, offset int) ([]dbrepo.NotificationRow, error) {
 	return dbrepo.ListUnifiedNotificationsPaged(r.db, userID, limit, offset)
+}
+
+func (r *sqlNotificationsRepository) ListPendingDivisionJobApprovalNotificationsPaged(limit, offset int) ([]dbrepo.NotificationRow, error) {
+	return dbrepo.ListPendingDivisionJobApprovalNotificationsPaged(r.db, limit, offset)
+}
+
+func (r *sqlNotificationsRepository) CountPendingDivisionJobApprovals() (int, error) {
+	return dbrepo.CountPendingDivisionJobApprovals(r.db)
 }
 
 func (r *sqlNotificationsRepository) CountPendingHRLetters() (int, error) {
@@ -56,7 +66,7 @@ func (r *sqlNotificationsRepository) CountUnreadRecentAuditLogs(userID int64) (i
 
 func SuperAdminNotifications(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !user.CanAccessHumanCapitalOperations() {
+	if user == nil || !user.CanAccessVacancyWorkflow() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -64,6 +74,46 @@ func SuperAdminNotifications(c *gin.Context) {
 	db := middleware.GetDB(c)
 	repo := newNotificationsRepository(db)
 	pagination := handlers.ParsePagination(c, 5, 50)
+
+	if user.IsManagerHC() {
+		sidebarNotifications := map[string]int{
+			"super-admin.divisions.index": 0,
+		}
+
+		sidebarNotifications["super-admin.divisions.index"], _ = repo.CountPendingDivisionJobApprovals()
+
+		total := 0
+		for _, count := range sidebarNotifications {
+			total += count
+		}
+		lastPage := (total + pagination.Limit - 1) / pagination.Limit
+		if lastPage <= 0 {
+			lastPage = 1
+		}
+
+		rows, _ := repo.ListPendingDivisionJobApprovalNotificationsPaged(pagination.Limit, pagination.Offset)
+		items := make([]dto.NotificationItem, 0, len(rows))
+		for _, row := range rows {
+			items = append(items, dto.NotificationItem{
+				ID:          row.ID,
+				Type:        row.Type,
+				Title:       row.Title,
+				Description: row.Description,
+				Timestamp:   handlers.DiffForHumans(row.CreatedAt),
+				URL:         row.URL,
+			})
+		}
+
+		c.JSON(http.StatusOK, dto.NotificationListResponse{
+			Data:                 items,
+			CurrentPage:          pagination.Page,
+			LastPage:             lastPage,
+			Total:                total,
+			PerPage:              pagination.Limit,
+			SidebarNotifications: sidebarNotifications,
+		})
+		return
+	}
 
 	sidebarNotifications := map[string]int{
 		"super-admin.letters.index":    0,
