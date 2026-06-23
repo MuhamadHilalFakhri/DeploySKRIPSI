@@ -45,6 +45,10 @@ func currentDisplayLocation() *time.Location {
 	return loc
 }
 
+func DisplayLocation() *time.Location {
+	return currentDisplayLocation()
+}
+
 func toDisplayTime(t *time.Time) time.Time {
 	return t.In(currentDisplayLocation())
 }

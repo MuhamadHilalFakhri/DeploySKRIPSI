@@ -25,6 +25,7 @@ type IndexPageProps = PageProps<{
     stats: {
         total: number;
         super_admin: number;
+        manager_hc: number;
         admin: number;
         staff: number;
         pelamar: number;
@@ -54,6 +55,7 @@ const EMPTY_USERS: PaginatedAccounts = {
 const EMPTY_STATS = {
     total: 0,
     super_admin: 0,
+    manager_hc: 0,
     admin: 0,
     staff: 0,
     pelamar: 0,
@@ -72,6 +74,10 @@ function decrementStatsByRole(stats: typeof EMPTY_STATS, role: string) {
     }
     if (normalizedRole === 'admin') {
         next.admin = Math.max(0, (stats.admin ?? 0) - 1);
+        return next;
+    }
+    if (normalizedRole === 'managerhc') {
+        next.manager_hc = Math.max(0, (stats.manager_hc ?? 0) - 1);
         return next;
     }
     if (normalizedRole === 'staff') {

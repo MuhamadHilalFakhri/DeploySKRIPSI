@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import AccountForm from '@/modules/SuperAdmin/components/accounts/AccountForm';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
+import { getLocalDateInputValue } from '@/shared/lib/date';
 import { Head, Link, router, useForm } from '@/shared/lib/inertia';
 import {
     PASSWORD_POLICY_ERROR_MESSAGE,
@@ -22,7 +23,7 @@ interface CreateProps {
     educationLevelOptions: string[];
 }
 
-const today = new Date().toISOString().split('T')[0];
+const today = getLocalDateInputValue();
 
 const roleRequiresDivision = (role: string) =>
     ['Admin', 'Staff'].includes(role);

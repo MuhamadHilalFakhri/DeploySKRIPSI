@@ -367,6 +367,17 @@ func divisionSummaries(db *sqlx.DB) []map[string]any {
 		return []map[string]any{}
 	}
 
+	divisionIDs := make([]int64, 0, len(profiles))
+	for _, profile := range profiles {
+		divisionIDs = append(divisionIDs, profile.ID)
+	}
+	publishedJobsByDivision := map[int64][]models.DivisionJob{}
+	if rows, jobsErr := dbrepo.ListPublishedDivisionJobsByDivisionIDs(db, divisionIDs); jobsErr == nil {
+		for _, row := range rows {
+			publishedJobsByDivision[row.DivisionProfileID] = append(publishedJobsByDivision[row.DivisionProfileID], row)
+		}
+	}
+
 	result := []map[string]any{}
 	for _, profile := range profiles {
 		currentStaff, _ := dbrepo.CountUsersByDivisionAndRoles(db, profile.Name, models.RoleAdmin, models.RoleStaff)
@@ -374,8 +385,10 @@ func divisionSummaries(db *sqlx.DB) []map[string]any {
 		if availableSlots < 0 {
 			availableSlots = 0
 		}
-		isHiring := profile.IsHiring && profile.JobTitle != nil
+		publishedJobs := publishedJobsByDivision[profile.ID]
+		isHiring := len(publishedJobs) > 0
 		if isHiring {
+			job := publishedJobs[0]
 			result = append(result, map[string]any{
 				"id":                       profile.ID,
 				"name":                     profile.Name,
@@ -385,12 +398,12 @@ func divisionSummaries(db *sqlx.DB) []map[string]any {
 				"current_staff":            currentStaff,
 				"available_slots":          availableSlots,
 				"is_hiring":                isHiring,
-				"job_title":                profile.JobTitle,
-				"job_description":          profile.JobDescription,
-				"job_salary_min":           profile.JobSalaryMin,
-				"job_work_mode":            profile.JobWorkMode,
-				"job_requirements":         decodeJSONStringArray(profile.JobRequirements),
-				"job_eligibility_criteria": decodeJSONMap(profile.JobEligibility),
+				"job_title":                &job.JobTitle,
+				"job_description":          &job.JobDescription,
+				"job_salary_min":           job.JobSalaryMin,
+				"job_work_mode":            job.JobWorkMode,
+				"job_requirements":         decodeJSONStringArray(job.JobRequirements),
+				"job_eligibility_criteria": decodeJSONMap(job.JobEligibility),
 			})
 		}
 	}

@@ -88,6 +88,7 @@ func SuperAdminAccountsIndex(c *gin.Context) {
 	stats := map[string]int{
 		"total":       statsFromDB.Total,
 		"super_admin": statsFromDB.SuperAdmin,
+		"manager_hc":  statsFromDB.ManagerHC,
 		"admin":       statsFromDB.Admin,
 		"staff":       statsFromDB.Staff,
 		"pelamar":     statsFromDB.Pelamar,
@@ -114,7 +115,7 @@ func SuperAdminAccountsIndex(c *gin.Context) {
 		},
 		"filters":              filters,
 		"stats":                stats,
-		"roleOptions":          models.UserRoles,
+		"roleOptions":          models.AssignableUserRoles,
 		"statusOptions":        models.UserStatuses,
 		"divisionOptions":      accountDivisionOptions(db),
 		"flash":                gin.H{"success": ""},
@@ -132,7 +133,7 @@ func SuperAdminAccountsCreate(c *gin.Context) {
 	db := middleware.GetDB(c)
 
 	c.JSON(http.StatusOK, gin.H{
-		"roleOptions":           models.UserRoles,
+		"roleOptions":           models.AssignableUserRoles,
 		"statusOptions":         models.UserStatuses,
 		"divisionOptions":       accountDivisionOptions(db),
 		"religionOptions":       models.StaffReligions,
@@ -196,7 +197,7 @@ func SuperAdminAccountsEdit(c *gin.Context) {
 			"registered_at":   handlers.FormatDateISO(account.RegisteredAt),
 			"inactive_at":     handlers.FormatDateISO(account.InactiveAt),
 		},
-		"roleOptions":           models.UserRoles,
+		"roleOptions":           models.AssignableUserRoles,
 		"statusOptions":         models.UserStatuses,
 		"divisionOptions":       accountDivisionOptions(db),
 		"religionOptions":       models.StaffReligions,

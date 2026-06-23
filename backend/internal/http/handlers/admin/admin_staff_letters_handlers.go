@@ -2,7 +2,6 @@ package admin
 
 import (
 	"hris-backend/internal/http/handlers"
-	superadmin "hris-backend/internal/http/handlers/superadmin"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
@@ -72,11 +71,6 @@ func AdminStaffLettersIndex(c *gin.Context) {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
-	if user.IsHumanCapitalAdmin() {
-		superadmin.SuperAdminLettersIndex(c)
-		return
-	}
-
 	db := middleware.GetDB(c)
 	repo := newAdminLettersRepository(db)
 	pagination := handlers.ParsePagination(c, 20, 100)
@@ -127,7 +121,7 @@ func AdminStaffLettersIndex(c *gin.Context) {
 
 func AdminStaffLettersStore(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || user.Role != models.RoleAdmin || user.IsHumanCapitalAdmin() {
+	if user == nil || user.Role != models.RoleAdmin {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -228,7 +222,7 @@ func AdminStaffLettersStore(c *gin.Context) {
 
 func AdminStaffLettersReply(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || user.Role != models.RoleAdmin || user.IsHumanCapitalAdmin() {
+	if user == nil || user.Role != models.RoleAdmin {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -322,7 +316,7 @@ func AdminStaffLettersReply(c *gin.Context) {
 
 func AdminStaffLettersArchive(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || user.Role != models.RoleAdmin || user.IsHumanCapitalAdmin() {
+	if user == nil || user.Role != models.RoleAdmin {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -373,7 +367,7 @@ func AdminStaffLettersArchive(c *gin.Context) {
 
 func AdminStaffLettersUnarchive(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || user.Role != models.RoleAdmin || user.IsHumanCapitalAdmin() {
+	if user == nil || user.Role != models.RoleAdmin {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}

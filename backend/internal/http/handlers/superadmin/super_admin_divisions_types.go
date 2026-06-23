@@ -28,6 +28,11 @@ type UpdateDivisionRequest struct {
 	Capacity    *int    `json:"capacity" form:"capacity"`
 }
 
+type VacancyWorkflowRequest struct {
+	JobID          *int64  `json:"job_id" form:"job_id"`
+	RejectionNote  string  `json:"rejection_note" form:"rejection_note"`
+}
+
 func sanitizeEligibilityCriteria(input map[string]interface{}) map[string]interface{} {
 	out := make(map[string]interface{})
 	if input == nil {

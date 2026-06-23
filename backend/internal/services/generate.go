@@ -16,6 +16,8 @@ func GenerateEmployeeCode(db *sqlx.DB, role string) (string, error) {
 	switch role {
 	case "Super Admin":
 		prefix = "SA"
+	case "Manager HC":
+		prefix = "MHC"
 	case "Admin":
 		prefix = "ADM"
 	case "Staff":

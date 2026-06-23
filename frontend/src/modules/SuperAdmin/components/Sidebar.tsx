@@ -17,6 +17,7 @@ import {
 import type { NavItem } from '@/modules/SuperAdmin/components/sidebar-config';
 import { Link, router, usePageManager } from '@/shared/lib/inertia';
 import { route } from '@/shared/lib/route';
+import { isManagerHCRole, isSuperAdminRole } from '@/shared/lib/user-roles';
 import { cn } from '@/shared/lib/utils';
 import { User } from '@/shared/types';
 
@@ -45,6 +46,7 @@ function Sidebar({
     const pathname = usePathname();
     const { authLoaded } = usePageManager();
     const logoutDisabled = !authLoaded;
+    const isRolePending = !authLoaded && !user?.role;
 
     // If the shell provides live notifications, use them directly.
     // Otherwise fall back to local Echo-driven state (standalone usage).
@@ -105,27 +107,32 @@ function Sidebar({
     // Resolved badge counts  external (from shell) or local (self-managed)
     const liveBadges = hasExternalNotifications ? notifications : localBadges;
 
-    const isSuperAdmin = user?.role === 'Super Admin';
-    const isHumanCapitalAdmin =
-        user?.role === 'Admin' &&
-        typeof user?.division === 'string' &&
-        /human\s+(capital|resources)/i.test(user.division);
+    const isSuperAdmin = isSuperAdminRole(user?.role);
+    const isManagerHC = isManagerHCRole(user?.role);
     const navItems: NavItem[] = useMemo(
-        () =>
-            isHumanCapitalAdmin
-                ? [
+        () => {
+            if (isRolePending) {
+                return [];
+            }
+            if (isManagerHC) {
+                return [
                     {
-                        label: 'Dashboard',
+                        label: 'Approval Lowongan',
                         icon: LayoutDashboard,
-                        routeName: 'super-admin.admin-hr.dashboard',
-                        pattern: 'super-admin.admin-hr.dashboard',
+                        routeName: 'super-admin.divisions.index',
+                        pattern: 'super-admin.divisions.*',
                     },
-                    ...defaultNavItems.filter((item) => item.routeName !== 'super-admin.dashboard'),
-                ]
-                : defaultNavItems,
-        [isHumanCapitalAdmin],
+                ];
+            }
+            return defaultNavItems;
+        },
+        [isManagerHC, isRolePending],
     );
-    const panelLabel = isHumanCapitalAdmin ? 'Admin HR' : 'Super Admin';
+    const panelLabel = isRolePending
+        ? 'Panel HR'
+        : isManagerHC
+            ? 'Manager HC'
+            : 'Super Admin';
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
     const handleNavClick = () => {

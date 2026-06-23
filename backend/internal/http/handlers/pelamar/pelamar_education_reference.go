@@ -82,7 +82,7 @@ func PelamarEducationReferences(c *gin.Context) {
 
 func SuperAdminEducationReferences(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, 403, "Forbidden")
 		return
 	}

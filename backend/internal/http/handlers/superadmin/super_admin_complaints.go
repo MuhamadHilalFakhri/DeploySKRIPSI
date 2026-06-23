@@ -57,7 +57,7 @@ func (r *sqlComplaintsRepository) GetUserByID(userID int64) (*models.User, error
 
 func SuperAdminComplaintsIndex(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -337,7 +337,7 @@ func startOfWeek(value time.Time) time.Time {
 
 func SuperAdminComplaintsUpdate(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}

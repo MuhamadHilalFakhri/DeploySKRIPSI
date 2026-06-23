@@ -36,6 +36,16 @@ type DivisionJobMutationInput struct {
 	JobEligibility    string
 	JobSalaryMin      *int
 	JobWorkMode       *string
+	WorkflowStatus    string
+	Now               time.Time
+}
+
+type DivisionJobWorkflowUpdateInput struct {
+	ID                int64
+	DivisionProfileID int64
+	WorkflowStatus    string
+	ActorUserID       int64
+	RejectionNote     *string
 	Now               time.Time
 }
 
@@ -200,7 +210,7 @@ func UpdateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) error {
 	}
 	_, err := db.Exec(
 		`UPDATE division_jobs
-		 SET job_title = ?, job_description = ?, job_requirements = ?, job_eligibility_criteria = ?, job_salary_min = ?, job_work_mode = ?, updated_at = ?
+		 SET job_title = ?, job_description = ?, job_requirements = ?, job_eligibility_criteria = ?, job_salary_min = ?, job_work_mode = ?, workflow_status = ?, updated_at = ?
 		 WHERE id = ? AND division_profile_id = ?`,
 		input.JobTitle,
 		input.JobDescription,
@@ -208,6 +218,7 @@ func UpdateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) error {
 		input.JobEligibility,
 		input.JobSalaryMin,
 		input.JobWorkMode,
+		input.WorkflowStatus,
 		input.Now,
 		input.ID,
 		input.DivisionProfileID,
@@ -223,8 +234,8 @@ func CreateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) (int64, erro
 		input.Now = time.Now()
 	}
 	result, err := db.Exec(
-		`INSERT INTO division_jobs (division_profile_id, job_title, job_description, job_requirements, job_eligibility_criteria, job_salary_min, job_work_mode, is_active, opened_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+		`INSERT INTO division_jobs (division_profile_id, job_title, job_description, job_requirements, job_eligibility_criteria, job_salary_min, job_work_mode, workflow_status, is_active, opened_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)`,
 		input.DivisionProfileID,
 		input.JobTitle,
 		input.JobDescription,
@@ -232,7 +243,7 @@ func CreateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) (int64, erro
 		input.JobEligibility,
 		input.JobSalaryMin,
 		input.JobWorkMode,
-		input.Now,
+		input.WorkflowStatus,
 		input.Now,
 		input.Now,
 	)
@@ -254,7 +265,7 @@ func DeactivateDivisionJob(db *sqlx.DB, divisionID, jobID int64, at time.Time) e
 		at = time.Now()
 	}
 	_, err := db.Exec(
-		"UPDATE division_jobs SET is_active = 0, closed_at = ?, updated_at = ? WHERE id = ? AND division_profile_id = ?",
+		"UPDATE division_jobs SET is_active = 0, workflow_status = 'closed', closed_at = ?, updated_at = ? WHERE id = ? AND division_profile_id = ?",
 		at,
 		at,
 		jobID,
@@ -271,7 +282,7 @@ func DeactivateAllDivisionJobs(db *sqlx.DB, divisionID int64, at time.Time) erro
 		at = time.Now()
 	}
 	_, err := db.Exec(
-		"UPDATE division_jobs SET is_active = 0, closed_at = ?, updated_at = ? WHERE division_profile_id = ? AND is_active = 1",
+		"UPDATE division_jobs SET is_active = 0, workflow_status = 'closed', closed_at = ?, updated_at = ? WHERE division_profile_id = ? AND is_active = 1",
 		at,
 		at,
 		divisionID,
@@ -287,8 +298,7 @@ func ReactivateDivisionJob(db *sqlx.DB, divisionID, jobID int64, at time.Time) e
 		at = time.Now()
 	}
 	_, err := db.Exec(
-		"UPDATE division_jobs SET is_active = 1, opened_at = ?, closed_at = NULL, updated_at = ? WHERE id = ? AND division_profile_id = ?",
-		at,
+		"UPDATE division_jobs SET is_active = 1, workflow_status = 'draft', opened_at = NULL, closed_at = NULL, submitted_by = NULL, submitted_at = NULL, approved_by = NULL, approved_at = NULL, rejected_by = NULL, rejected_at = NULL, rejection_note = NULL, published_by = NULL, published_at = NULL, updated_at = ? WHERE id = ? AND division_profile_id = ?",
 		at,
 		jobID,
 		divisionID,
@@ -296,22 +306,26 @@ func ReactivateDivisionJob(db *sqlx.DB, divisionID, jobID int64, at time.Time) e
 	return wrapRepoErr("reactivate division job", err)
 }
 
-func ListActiveDivisionJobs(db *sqlx.DB) ([]models.DivisionJob, error) {
+func ListPublishedDivisionJobs(db *sqlx.DB) ([]models.DivisionJob, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
 	}
 	rows := []models.DivisionJob{}
-	err := db.Select(&rows, "SELECT * FROM division_jobs WHERE is_active = 1 ORDER BY opened_at DESC, id DESC")
+	err := db.Select(&rows, "SELECT * FROM division_jobs WHERE is_active = 1 AND workflow_status = 'published' ORDER BY opened_at DESC, id DESC")
 	if err != nil {
 		if strings.Contains(err.Error(), "doesn't exist") {
 			return []models.DivisionJob{}, nil
 		}
-		return nil, wrapRepoErr("list active division jobs", err)
+		return nil, wrapRepoErr("list published division jobs", err)
 	}
 	return rows, nil
 }
 
-func ListActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]models.DivisionJob, error) {
+func ListActiveDivisionJobs(db *sqlx.DB) ([]models.DivisionJob, error) {
+	return ListPublishedDivisionJobs(db)
+}
+
+func ListPublishedDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]models.DivisionJob, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
 	}
@@ -320,11 +334,11 @@ func ListActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]mo
 	}
 
 	query, args, err := sqlx.In(
-		"SELECT * FROM division_jobs WHERE is_active = 1 AND division_profile_id IN (?) ORDER BY opened_at DESC, id DESC",
+		"SELECT * FROM division_jobs WHERE is_active = 1 AND workflow_status = 'published' AND division_profile_id IN (?) ORDER BY opened_at DESC, id DESC",
 		divisionIDs,
 	)
 	if err != nil {
-		return nil, wrapRepoErr("list active division jobs by division ids build query", err)
+		return nil, wrapRepoErr("list published division jobs by division ids build query", err)
 	}
 
 	query = db.Rebind(query)
@@ -334,9 +348,13 @@ func ListActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]mo
 		if strings.Contains(err.Error(), "doesn't exist") {
 			return []models.DivisionJob{}, nil
 		}
-		return nil, wrapRepoErr("list active division jobs by division ids", err)
+		return nil, wrapRepoErr("list published division jobs by division ids", err)
 	}
 	return rows, nil
+}
+
+func ListActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]models.DivisionJob, error) {
+	return ListPublishedDivisionJobsByDivisionIDs(db, divisionIDs)
 }
 
 func ListDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]models.DivisionJob, error) {
@@ -367,19 +385,94 @@ func ListDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]models.D
 	return rows, nil
 }
 
-func GetPrimaryActiveDivisionJob(db *sqlx.DB, divisionID int64) (*models.DivisionJob, error) {
+func GetPrimaryPublishedDivisionJob(db *sqlx.DB, divisionID int64) (*models.DivisionJob, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
 	}
 	var row models.DivisionJob
-	err := db.Get(&row, "SELECT * FROM division_jobs WHERE division_profile_id = ? AND is_active = 1 ORDER BY opened_at DESC, id DESC LIMIT 1", divisionID)
+	err := db.Get(&row, "SELECT * FROM division_jobs WHERE division_profile_id = ? AND is_active = 1 AND workflow_status = 'published' ORDER BY COALESCE(published_at, opened_at, updated_at) DESC, id DESC LIMIT 1", divisionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, wrapRepoErr("get primary active division job", err)
+		return nil, wrapRepoErr("get primary published division job", err)
 	}
 	return &row, nil
+}
+
+func UpdateDivisionJobWorkflowStatus(db *sqlx.DB, input DivisionJobWorkflowUpdateInput) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	if input.Now.IsZero() {
+		input.Now = time.Now()
+	}
+
+	query := ""
+	args := []any{}
+	switch strings.TrimSpace(input.WorkflowStatus) {
+	case "pending_approval":
+		query = `UPDATE division_jobs
+			SET workflow_status = 'pending_approval',
+			    submitted_by = ?,
+			    submitted_at = ?,
+			    approved_by = NULL,
+			    approved_at = NULL,
+			    rejected_by = NULL,
+			    rejected_at = NULL,
+			    rejection_note = NULL,
+			    updated_at = ?
+			WHERE id = ? AND division_profile_id = ? AND is_active = 1`
+		args = []any{input.ActorUserID, input.Now, input.Now, input.ID, input.DivisionProfileID}
+	case "approved":
+		query = `UPDATE division_jobs
+			SET workflow_status = 'approved',
+			    approved_by = ?,
+			    approved_at = ?,
+			    rejected_by = NULL,
+			    rejected_at = NULL,
+			    rejection_note = NULL,
+			    updated_at = ?
+			WHERE id = ? AND division_profile_id = ? AND is_active = 1`
+		args = []any{input.ActorUserID, input.Now, input.Now, input.ID, input.DivisionProfileID}
+	case "rejected":
+		query = `UPDATE division_jobs
+			SET workflow_status = 'rejected',
+			    rejected_by = ?,
+			    rejected_at = ?,
+			    rejection_note = ?,
+			    updated_at = ?
+			WHERE id = ? AND division_profile_id = ? AND is_active = 1`
+		args = []any{input.ActorUserID, input.Now, nullableStringPtr(input.RejectionNote), input.Now, input.ID, input.DivisionProfileID}
+	case "published":
+		query = `UPDATE division_jobs
+			SET workflow_status = 'published',
+			    published_by = ?,
+			    published_at = ?,
+			    opened_at = ?,
+			    closed_at = NULL,
+			    updated_at = ?
+			WHERE id = ? AND division_profile_id = ? AND is_active = 1`
+		args = []any{input.ActorUserID, input.Now, input.Now, input.Now, input.ID, input.DivisionProfileID}
+	case "draft":
+		query = `UPDATE division_jobs
+			SET workflow_status = 'draft',
+			    submitted_by = NULL,
+			    submitted_at = NULL,
+			    approved_by = NULL,
+			    approved_at = NULL,
+			    rejected_by = NULL,
+			    rejected_at = NULL,
+			    rejection_note = NULL,
+			    updated_at = ?
+			WHERE id = ? AND division_profile_id = ? AND is_active = 1`
+		args = []any{input.Now, input.ID, input.DivisionProfileID}
+	default:
+		return errors.New("workflow status tidak valid")
+	}
+
+	_, err := db.Exec(query, args...)
+	return wrapRepoErr("update division job workflow status", err)
 }
 
 func ClearDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64, updatedAt time.Time) error {

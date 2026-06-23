@@ -1,5 +1,5 @@
 ﻿import { Menu, Bell } from 'lucide-react';
-import { PropsWithChildren, useState, useEffect, useCallback, useMemo } from 'react';
+import { PropsWithChildren, useState, useEffect, useCallback } from 'react';
 import { Toaster, toast } from 'sonner';
 
 import NotificationDropdown from '@/modules/SuperAdmin/components/NotificationDropdown';
@@ -8,8 +8,9 @@ import Sidebar from '@/modules/SuperAdmin/components/Sidebar';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { api, apiUrl } from '@/shared/lib/api';
-import { usePage } from '@/shared/lib/inertia';
+import { usePage, usePageManager } from '@/shared/lib/inertia';
 import { consumeLoginSuccessToast } from '@/shared/lib/login-success-toast';
+import { canAccessHumanCapitalOperations, isManagerHCRole } from '@/shared/lib/user-roles';
 import { cn } from '@/shared/lib/utils';
 import { PageProps } from '@/shared/types';
 
@@ -22,6 +23,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
     const {
         props: { auth, sidebarNotifications = {} },
     } = usePage<PageProps<{ sidebarNotifications?: Record<string, number> }>>();
+    const { authLoaded } = usePageManager();
     
     const user = auth?.user;
 
@@ -71,13 +73,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
             return;
         }
 
-        const isSuperAdmin = user.role === 'Super Admin' || user.role === 'SuperAdmin';
-        const isHumanCapitalAdmin =
-            user.role === 'Admin' &&
-            typeof user.division === 'string' &&
-            /human\s+(capital|resources)/i.test(user.division);
-
-        if (!isSuperAdmin && !isHumanCapitalAdmin) {
+        if (!canAccessHumanCapitalOperations(user)) {
             return;
         }
 
@@ -265,6 +261,18 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         setIsMobileMenuOpen(false);
     }, []);
 
+    const isRolePending = !authLoaded && !user?.role;
+
+    const panelLabel = (() => {
+        if (isRolePending) {
+            return 'Panel HR';
+        }
+        if (isManagerHCRole(user?.role)) {
+            return 'Manager HC';
+        }
+        return 'Super Admin';
+    })();
+
     //  Render 
     return (
         <div className="flex min-h-screen bg-slate-50 text-slate-900">
@@ -308,7 +316,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
                                 PT. Lintas Data Prima
                             </p>
                             <p className="text-sm font-semibold text-blue-900">
-                                Super Admin
+                                {panelLabel}
                             </p>
                         </div>
                     </div>
@@ -337,12 +345,16 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
                                 <span className="text-white text-sm">
                                     {user?.name
                                         ? user.name.charAt(0).toUpperCase()
-                                        : 'SA'}
+                                        : panelLabel
+                                              .split(' ')
+                                              .map((part) => part.charAt(0))
+                                              .join('')
+                                              .slice(0, 2)}
                                 </span>
                             </div>
                             <div className="text-left hidden lg:block">
                                 <p className="text-sm font-medium text-gray-900">
-                                    {user?.name || 'Super Admin'}
+                                    {user?.name || panelLabel}
                                 </p>
                             </div>
                         </div>

@@ -8,14 +8,13 @@ import (
 
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
-	"hris-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
 
 func SuperAdminRecruitmentScoringEvaluation(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -134,7 +133,7 @@ func SuperAdminRecruitmentScoringEvaluation(c *gin.Context) {
 
 func SuperAdminRecruitmentScoringAnalytics(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}

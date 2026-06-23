@@ -23,6 +23,7 @@ import {
     getCityDisplayName,
 } from '@/shared/data/indonesian-locations';
 import { api, apiUrl } from '@/shared/lib/api';
+import { getLocalDateInputValue } from '@/shared/lib/date';
 import { useForm, usePage } from '@/shared/lib/inertia';
 import {
     imageUploadRule,
@@ -634,10 +635,12 @@ function validate(data: Data, section: 'personal' | 'education'): Record<string,
             }
         }
         if (data.date_of_birth) {
-            const selected = new Date(data.date_of_birth).getTime();
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            if (Number.isNaN(selected)) errs.date_of_birth = 'Format tanggal lahir tidak valid.';
-            else if (selected >= today.getTime()) errs.date_of_birth = 'Tidak dapat memilih tanggal hari ini atau masa depan.';
+            const today = getLocalDateInputValue();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date_of_birth)) {
+                errs.date_of_birth = 'Format tanggal lahir tidak valid.';
+            } else if (data.date_of_birth >= today) {
+                errs.date_of_birth = 'Tidak dapat memilih tanggal hari ini atau masa depan.';
+            }
         }
         return errs;
     }

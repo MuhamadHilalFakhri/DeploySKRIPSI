@@ -8,7 +8,6 @@ import (
 
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
-	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
 	"hris-backend/internal/services"
 
@@ -17,7 +16,7 @@ import (
 
 func SuperAdminDivisionsIndex(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessVacancyWorkflow() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -56,9 +55,13 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		jobs := jobsByDivisionID[profile.ID]
 		jobs = mergeDivisionJobsWithClosedAuditFallback(jobs, closedJobsFromAuditByDivisionID[profile.ID])
 		activeJobs := make([]map[string]any, 0, len(jobs))
+		publishedJobs := make([]map[string]any, 0, len(jobs))
 		for _, job := range jobs {
 			if isActive, ok := job["is_active"].(bool); ok && isActive {
 				activeJobs = append(activeJobs, job)
+				if workflowStatus := strings.TrimSpace(handlers.AnyToString(job["workflow_status"])); workflowStatus == "published" {
+					publishedJobs = append(publishedJobs, job)
+				}
 			}
 		}
 		if len(activeJobs) == 0 && profile.IsHiring && profile.JobTitle != nil && strings.TrimSpace(*profile.JobTitle) != "" {
@@ -70,15 +73,17 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 				"job_work_mode":            profile.JobWorkMode,
 				"job_requirements":         handlers.DecodeJSONStringArray(profile.JobRequirements),
 				"job_eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
+				"workflow_status":          "published",
 				"is_active":                true,
 				"opened_at":                profile.HiringOpenedAt,
 				"closed_at":                nil,
 			}
 			activeJobs = append(activeJobs, legacyActiveJob)
 			jobs = append(jobs, legacyActiveJob)
+			publishedJobs = append(publishedJobs, legacyActiveJob)
 		}
-		isHiring := len(activeJobs) > 0
-		activeVacancies += len(activeJobs)
+		isHiring := len(publishedJobs) > 0
+		activeVacancies += len(publishedJobs)
 		totalStaff += currentStaff
 		availableSlotsTotal += availableSlots
 
@@ -145,6 +150,17 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 			"job_eligibility_criteria": primaryJobEligibility,
 			"jobs":                     jobs,
 			"staff":                    staffList,
+			"permissions": map[string]bool{
+				"can_edit_drafts":   user.CanEditVacancyDrafts(),
+				"can_submit":        user.CanEditVacancyDrafts(),
+				"can_publish":       user.CanPublishApprovedVacancies(),
+				"can_approve":       user.CanApproveVacancyWorkflow(),
+				"can_reject":        user.CanApproveVacancyWorkflow(),
+				"can_close":         user.CanEditVacancyDrafts(),
+				"can_reopen":        user.CanEditVacancyDrafts(),
+				"can_create_draft":  user.CanEditVacancyDrafts(),
+				"manager_view_only": user.IsManagerHC(),
+			},
 		})
 	}
 
@@ -160,12 +176,13 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		"stats":                stats,
 		"flash":                gin.H{"success": "", "error": ""},
 		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
+		"viewerRole":           user.Role,
 	})
 }
 
 func SuperAdminDivisionsStore(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanEditVacancyDrafts() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -282,7 +299,7 @@ func SuperAdminDivisionsStore(c *gin.Context) {
 
 func SuperAdminDivisionsUpdate(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanEditVacancyDrafts() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -402,7 +419,7 @@ func SuperAdminDivisionsUpdate(c *gin.Context) {
 
 func SuperAdminDivisionsDelete(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanEditVacancyDrafts() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}

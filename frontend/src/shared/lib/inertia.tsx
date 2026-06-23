@@ -5,6 +5,7 @@ import React, { useCallback, useContext, useEffect, useMemo, useState } from 're
 
 import { api, apiUrl } from '@/shared/lib/api';
 import { setCurrentRouteName } from '@/shared/lib/route';
+import { canAccessHumanCapitalOperations } from '@/shared/lib/user-roles';
 
 import { PageContext } from './inertia-context';
 import { useForm } from './inertia-form';
@@ -211,16 +212,7 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const user = props?.auth?.user;
-    if (!user) {
-      return;
-    }
-    const isSuperAdmin = user.role === 'SuperAdmin' || user.role === 'Super Admin';
-    const isHumanCapitalAdmin =
-      user.role === 'Admin' &&
-      typeof user.division === 'string' &&
-      /human\s+(capital|resources)/i.test(user.division);
-
-    if (!isSuperAdmin && !isHumanCapitalAdmin) {
+    if (!canAccessHumanCapitalOperations(user)) {
       return;
     }
 

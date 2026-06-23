@@ -21,6 +21,10 @@ type DivisionTabsProps = {
     onOpenJobDialog: (division: DivisionRecord, job?: DivisionJob) => void;
     onReopenJob: (division: DivisionRecord, job: DivisionJob) => void;
     onCloseJob: (division: DivisionRecord, jobId?: number) => void;
+    onSubmitApproval: (division: DivisionRecord, job: DivisionJob) => void;
+    onPublishJob: (division: DivisionRecord, job: DivisionJob) => void;
+    onApproveJob: (division: DivisionRecord, job: DivisionJob) => void;
+    onRejectJob: (division: DivisionRecord, job: DivisionJob, note: string) => void;
     onDeleteDivision: (division: DivisionRecord) => void;
     deletingDivisionId: number | null;
 };
@@ -33,6 +37,10 @@ export function DivisionTabs({
     onOpenJobDialog,
     onReopenJob,
     onCloseJob,
+    onSubmitApproval,
+    onPublishJob,
+    onApproveJob,
+    onRejectJob,
     onDeleteDivision,
     deletingDivisionId,
 }: DivisionTabsProps) {
@@ -91,6 +99,7 @@ export function DivisionTabs({
                             onEdit={() => onEditDivision(division)}
                             onDelete={() => onDeleteDivision(division)}
                             isDeleting={deletingDivisionId === division.id}
+                            canManage={division.permissions?.can_edit_drafts}
                         />
                         <DivisionOverview division={division} hasActiveJobs={activeJobs.length > 0} />
                         <DivisionStaffTable staff={division.staff} />
@@ -99,6 +108,10 @@ export function DivisionTabs({
                             onOpenJob={onOpenJobDialog}
                             onReopenJob={onReopenJob}
                             onCloseJob={onCloseJob}
+                            onSubmitApproval={onSubmitApproval}
+                            onPublishJob={onPublishJob}
+                            onApproveJob={onApproveJob}
+                            onRejectJob={onRejectJob}
                         />
                     </TabsContent>
                 );

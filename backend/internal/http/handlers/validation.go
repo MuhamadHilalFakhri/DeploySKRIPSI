@@ -91,6 +91,29 @@ func ParseDateStrict(value string, layout string) (time.Time, error) {
 	return time.Parse(layout, strings.TrimSpace(value))
 }
 
+func ParseDateStrictInLocation(value string, layout string, loc *time.Location) (time.Time, error) {
+	if loc == nil {
+		loc = time.Local
+	}
+	return time.ParseInLocation(layout, strings.TrimSpace(value), loc)
+}
+
+func ParseDateStrictInDisplayLocation(value string, layout string) (time.Time, error) {
+	return ParseDateStrictInLocation(value, layout, currentDisplayLocation())
+}
+
+func StartOfDay(value time.Time, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = value.Location()
+	}
+	local := value.In(loc)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
+}
+
+func StartOfDisplayDay(value time.Time) time.Time {
+	return StartOfDay(value, currentDisplayLocation())
+}
+
 func ValidateURL(errs FieldErrors, field, label, value string, requireHTTPS bool) {
 	if errs == nil {
 		return

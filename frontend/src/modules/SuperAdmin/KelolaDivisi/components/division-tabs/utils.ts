@@ -2,7 +2,7 @@ import type { DivisionJob, DivisionRecord } from '@/modules/SuperAdmin/KelolaDiv
 
 export function getActiveDivisionJobs(division: DivisionRecord): DivisionJob[] {
     const jobs = Array.isArray(division.jobs)
-        ? division.jobs.filter((job) => job && job.is_active !== false)
+        ? division.jobs.filter((job) => job && job.workflow_status !== 'closed' && job.is_active !== false)
         : [];
 
     if (jobs.length > 0) {
@@ -21,6 +21,7 @@ export function getActiveDivisionJobs(division: DivisionRecord): DivisionJob[] {
                     ? division.job_requirements
                     : [],
                 job_eligibility_criteria: division.job_eligibility_criteria,
+                workflow_status: 'published',
                 is_active: true,
             },
         ];
@@ -34,5 +35,5 @@ export function getInactiveDivisionJobs(division: DivisionRecord): DivisionJob[]
         return [];
     }
 
-    return division.jobs.filter((job) => job && job.is_active === false);
+    return division.jobs.filter((job) => job && (job.workflow_status === 'closed' || job.is_active === false));
 }

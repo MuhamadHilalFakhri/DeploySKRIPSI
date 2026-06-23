@@ -64,7 +64,7 @@ func LandingData(c *gin.Context) {
 		divisionIDs = append(divisionIDs, profile.ID)
 	}
 	activeJobsByDivisionID := map[int64][]map[string]any{}
-	activeJobs, activeJobsErr := dbrepo.ListActiveDivisionJobsByDivisionIDs(db, divisionIDs)
+	activeJobs, activeJobsErr := dbrepo.ListPublishedDivisionJobsByDivisionIDs(db, divisionIDs)
 	if activeJobsErr == nil {
 		for _, job := range activeJobs {
 			activeJobsByDivisionID[job.DivisionProfileID] = append(activeJobsByDivisionID[job.DivisionProfileID], map[string]any{

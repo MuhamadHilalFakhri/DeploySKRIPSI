@@ -23,6 +23,7 @@ type DivisionHeaderProps = {
     onEdit: () => void;
     onDelete: () => void;
     isDeleting: boolean;
+    canManage?: boolean;
 };
 
 export function DivisionHeader({
@@ -31,6 +32,7 @@ export function DivisionHeader({
     onEdit,
     onDelete,
     isDeleting,
+    canManage = true,
 }: DivisionHeaderProps) {
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     const hasStaff = division.current_staff > 0;
@@ -44,7 +46,7 @@ export function DivisionHeader({
                         {activeJobsCount > 0 && (
                             <Badge className="bg-green-600 hover:bg-green-600">
                                 <Briefcase className="mr-1 h-3 w-3" />
-                                {activeJobsCount} Lowongan Aktif
+                                {activeJobsCount} Workflow Lowongan
                             </Badge>
                         )}
                     </div>
@@ -58,42 +60,44 @@ export function DivisionHeader({
                         </span>
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={onEdit}>
-                        <Settings className="mr-2 h-4 w-4" />
-                        Pengaturan
-                    </Button>
-                    <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                disabled={hasStaff || isDeleting}
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Hapus Divisi
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-white">
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Hapus Divisi?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Divisi yang dihapus tidak akan muncul lagi pada konfigurasi divisi.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Batal</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={onDelete}
-                                    className="bg-red-600 text-white hover:bg-red-700"
+                {canManage && (
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={onEdit}>
+                            <Settings className="mr-2 h-4 w-4" />
+                            Pengaturan
+                        </Button>
+                        <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+                            <AlertDialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    disabled={hasStaff || isDeleting}
                                 >
-                                    Hapus
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                </div>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Hapus Divisi
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-white">
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Hapus Divisi?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Divisi yang dihapus tidak akan muncul lagi pada konfigurasi divisi.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={onDelete}
+                                        className="bg-red-600 text-white hover:bg-red-700"
+                                    >
+                                        Hapus
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
+                )}
             </div>
             {hasStaff && (
                 <p className="mt-3 text-xs text-red-600">

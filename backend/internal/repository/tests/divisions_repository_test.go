@@ -92,7 +92,7 @@ func TestListActiveDivisionJobs_MissingTableReturnsEmpty(t *testing.T) {
 	db, mock, cleanup := newSQLXMock(t)
 	defer cleanup()
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM division_jobs WHERE is_active = 1 ORDER BY opened_at DESC, id DESC")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM division_jobs WHERE is_active = 1 AND workflow_status = 'published' ORDER BY opened_at DESC, id DESC")).
 		WillReturnError(errors.New("Table 'hris.division_jobs' doesn't exist"))
 
 	rows, err := repository.ListActiveDivisionJobs(db)
@@ -109,7 +109,7 @@ func TestListActiveDivisionJobs_QueryErrorWrapped(t *testing.T) {
 	defer cleanup()
 
 	queryErr := errors.New("select fail")
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM division_jobs WHERE is_active = 1 ORDER BY opened_at DESC, id DESC")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM division_jobs WHERE is_active = 1 AND workflow_status = 'published' ORDER BY opened_at DESC, id DESC")).
 		WillReturnError(queryErr)
 
 	_, err := repository.ListActiveDivisionJobs(db)
@@ -119,7 +119,7 @@ func TestListActiveDivisionJobs_QueryErrorWrapped(t *testing.T) {
 	if !errors.Is(err, queryErr) {
 		t.Fatalf("expected wrapped query error, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "list active division jobs") {
+	if !strings.Contains(err.Error(), "list published division jobs") {
 		t.Fatalf("expected contextual error, got %v", err)
 	}
 }

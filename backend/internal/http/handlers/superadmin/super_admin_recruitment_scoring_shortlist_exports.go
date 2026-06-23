@@ -22,7 +22,7 @@ import (
 
 func SuperAdminRecruitmentAutoShortlist(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -189,7 +189,7 @@ func SuperAdminRecruitmentAutoShortlist(c *gin.Context) {
 
 func SuperAdminRecruitmentExportScoreReport(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -295,7 +295,7 @@ func SuperAdminRecruitmentExportScoreReport(c *gin.Context) {
 
 func SuperAdminRecruitmentExportScoreReportPDF(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}

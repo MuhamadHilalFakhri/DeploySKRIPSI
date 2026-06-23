@@ -32,9 +32,17 @@ func SuperAdminAccountsStore(c *gin.Context) {
 	inactiveAt := strings.TrimSpace(c.PostForm("inactive_at"))
 	password := strings.TrimSpace(c.PostForm("password"))
 	passwordConfirmation := strings.TrimSpace(c.PostForm("password_confirmation"))
+	now := time.Now()
+
+	if registeredAt == "" {
+		registeredAt = now.Format("2006-01-02")
+	}
+	if status == "Inactive" && inactiveAt == "" {
+		inactiveAt = now.Format("2006-01-02")
+	}
 
 	db := middleware.GetDB(c)
-	fieldErrors, err := validateAccountInput(c, db, role, division, name, email, status, registeredAt, inactiveAt, password, passwordConfirmation)
+	fieldErrors, err := validateAccountInput(c, db, models.AssignableUserRoles, role, division, name, email, status, registeredAt, "", inactiveAt, password, passwordConfirmation)
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memvalidasi data akun")
 		return
@@ -55,14 +63,6 @@ func SuperAdminAccountsStore(c *gin.Context) {
 	}
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	now := time.Now()
-
-	if registeredAt == "" {
-		registeredAt = now.Format("2006-01-02")
-	}
-	if status == "Inactive" && inactiveAt == "" {
-		inactiveAt = now.Format("2006-01-02")
-	}
 
 	var createdID int64
 	employeeCode, err := services.WithGeneratedEmployeeCodeRetry(db, role, func(code string) error {
@@ -142,7 +142,25 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 	password := strings.TrimSpace(c.PostForm("password"))
 
 	db := middleware.GetDB(c)
-	fieldErrors, err := validateAccountInput(c, db, role, division, name, email, status, registeredAt, inactiveAt, "_skip_password_", "_skip_password_")
+	existingUser, err := dbrepo.GetUserByID(db, id)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat data user")
+		return
+	}
+	if existingUser == nil {
+		handlers.JSONError(c, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+	if registeredAt == "" {
+		registeredAt = handlers.FormatDateISO(existingUser.RegisteredAt)
+	}
+	minRegisteredAt := handlers.FormatDateISO(existingUser.RegisteredAt)
+	now := time.Now()
+	if status == "Inactive" && inactiveAt == "" {
+		inactiveAt = now.Format("2006-01-02")
+	}
+
+	fieldErrors, err := validateAccountInput(c, db, models.AssignableUserRoles, role, division, name, email, status, registeredAt, minRegisteredAt, inactiveAt, "_skip_password_", "_skip_password_")
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memvalidasi data akun")
 		return
@@ -162,20 +180,6 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		return
 	}
 
-	existingUser, err := dbrepo.GetUserByID(db, id)
-	if err != nil {
-		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat data user")
-		return
-	}
-	if existingUser == nil {
-		handlers.JSONError(c, http.StatusNotFound, "User tidak ditemukan")
-		return
-	}
-
-	if status == "Inactive" && inactiveAt == "" {
-		inactiveAt = time.Now().Format("2006-01-02")
-	}
-
 	var employeeCode *string
 	roleChanged := existingUser.Role != role
 	missingEmployeeCode := existingUser.EmployeeCode == nil || strings.TrimSpace(ptrToString(existingUser.EmployeeCode)) == ""
@@ -187,7 +191,6 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		passwordHash = &hashed
 	}
 
-	now := time.Now()
 	if roleChanged || missingEmployeeCode {
 		generatedCode, genErr := services.WithGeneratedEmployeeCodeRetry(db, role, func(code string) error {
 			employeeCode = &code
@@ -442,12 +445,14 @@ func SuperAdminAccountsResetPassword(c *gin.Context) {
 func validateAccountInput(
 	c *gin.Context,
 	db *sqlx.DB,
+	allowedRoles []string,
 	role string,
 	division string,
 	name string,
 	email string,
 	status string,
 	registeredAt string,
+	minRegisteredAt string,
 	inactiveAt string,
 	password string,
 	passwordConfirmation string,
@@ -474,17 +479,40 @@ func validateAccountInput(
 	handlers.ValidateFieldLength(fieldErrors, "registered_at", "Tanggal registrasi", registeredAt, 30)
 	handlers.ValidateFieldLength(fieldErrors, "inactive_at", "Tanggal nonaktif", inactiveAt, 30)
 	handlers.ValidateEmail(fieldErrors, "email", email)
-	handlers.ValidateAllowedValue(fieldErrors, "role", "Role", role, models.UserRoles)
+	handlers.ValidateAllowedValue(fieldErrors, "role", "Role", role, allowedRoles)
 	handlers.ValidateAllowedValue(fieldErrors, "status", "Status", status, models.UserStatuses)
+	var parsedRegisteredAt *time.Time
 	if registeredAt != "" {
-		if _, err := handlers.ParseDateStrict(registeredAt, "2006-01-02"); err != nil {
+		parsedValue, err := handlers.ParseDateStrictInDisplayLocation(registeredAt, "2006-01-02")
+		if err != nil {
 			fieldErrors["registered_at"] = "Format tanggal registrasi tidak valid."
+		} else if minRegisteredAt != "" {
+			parsedRegisteredAt = &parsedValue
+			minDate, minErr := handlers.ParseDateStrictInDisplayLocation(minRegisteredAt, "2006-01-02")
+			if minErr == nil && parsedValue.Before(minDate) {
+				fieldErrors["registered_at"] = "Tanggal terdaftar tidak boleh lebih awal dari tanggal terdaftar sebelumnya."
+			}
+		} else {
+			parsedRegisteredAt = &parsedValue
 		}
 	}
+	var parsedInactiveAt *time.Time
 	if inactiveAt != "" {
-		if _, err := handlers.ParseDateStrict(inactiveAt, "2006-01-02"); err != nil {
+		parsedValue, err := handlers.ParseDateStrictInDisplayLocation(inactiveAt, "2006-01-02")
+		if err != nil {
 			fieldErrors["inactive_at"] = "Format tanggal nonaktif tidak valid."
+		} else {
+			parsedInactiveAt = &parsedValue
 		}
+	}
+	if status == "Active" && inactiveAt != "" {
+		fieldErrors["inactive_at"] = "Tanggal nonaktif hanya boleh diisi untuk akun berstatus Inactive."
+	}
+	if status == "Inactive" && inactiveAt == "" {
+		fieldErrors["inactive_at"] = "Tanggal nonaktif wajib diisi untuk akun berstatus Inactive."
+	}
+	if parsedRegisteredAt != nil && parsedInactiveAt != nil && parsedInactiveAt.Before(*parsedRegisteredAt) {
+		fieldErrors["inactive_at"] = "Tanggal nonaktif tidak boleh lebih awal dari tanggal terdaftar."
 	}
 
 	checkPassword := password != "_skip_password_" || passwordConfirmation != "_skip_password_"

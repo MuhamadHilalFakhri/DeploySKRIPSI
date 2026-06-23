@@ -29,6 +29,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { useForm } from '@/shared/lib/inertia';
+import { getLocalDateInputValue } from '@/shared/lib/date';
 import {
     normalizePersonName,
     sanitizePersonNameInput,
@@ -115,6 +116,17 @@ export default function ScheduleInterviewDialog({
             const blocked = new Set<string>();
             if (!selectedDate) return blocked;
 
+            if (selectedDate === getLocalDateInputValue()) {
+                const now = new Date();
+                const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                TIME_SLOTS.forEach((slot) => {
+                    const slotStart = toMinutes(slot);
+                    if (slotStart !== null && slotStart <= currentMinutes) {
+                        blocked.add(slot);
+                    }
+                });
+            }
+
             existingInterviews.forEach((interview) => {
                 if (!interview.time || !interview.date) return;
                 const interviewDate = interview.date_value ?? interview.date;
@@ -162,7 +174,7 @@ export default function ScheduleInterviewDialog({
             return;
         }
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalDateInputValue();
         const initialDate = applicant.interview_date ?? today;
         const normalizedTime = applicant.interview_time
             ? applicant.interview_time.slice(0, 5)
@@ -243,6 +255,14 @@ export default function ScheduleInterviewDialog({
             setTimeRangeError('Waktu selesai harus lebih besar dari waktu mulai.');
             return;
         }
+        if (data.date === getLocalDateInputValue()) {
+            const now = new Date();
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            if (startMinutes <= currentMinutes) {
+                setTimeRangeError('Waktu mulai interview harus di masa depan untuk jadwal hari ini.');
+                return;
+            }
+        }
         if (hasTimeConflict) {
             setConflictError('Slot waktu ini sudah terpakai (overlap).');
             return;
@@ -322,7 +342,7 @@ export default function ScheduleInterviewDialog({
                                     value={data.date}
                                     onChange={(e) => handleDateChange(e.target.value)}
                                     required
-                                    min={new Date().toISOString().split('T')[0]}
+                                    min={getLocalDateInputValue()}
                                     className="w-full h-10 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
                                 />
                                 {errors['date'] && <p className="text-xs text-red-500 font-medium">{errors['date']}</p>}

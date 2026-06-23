@@ -2,7 +2,6 @@ package admin
 
 import (
 	"hris-backend/internal/http/handlers"
-	superadmin "hris-backend/internal/http/handlers/superadmin"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
@@ -16,11 +15,6 @@ func AdminStaffDashboard(c *gin.Context) {
 	user := middleware.CurrentUser(c)
 	if user == nil || user.Role != models.RoleAdmin {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
-		return
-	}
-
-	if user.IsHumanCapitalAdmin() {
-		superadmin.SuperAdminAdminHrDashboard(c)
 		return
 	}
 
@@ -83,11 +77,6 @@ func AdminStaffRecruitment(c *gin.Context) {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
-	if user.IsHumanCapitalAdmin() {
-		superadmin.SuperAdminRecruitmentIndex(c)
-		return
-	}
-
 	db := middleware.GetDB(c)
 	apps, _ := dbrepo.ListRecentApplications(db, 20)
 

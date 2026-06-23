@@ -91,6 +91,7 @@ export default function KelolaDivisiIndex({
     divisions: initialDivisions,
     stats: initialStats,
     flash,
+    viewerRole,
 }: KelolaDivisiPageProps) {
     const [divisions, setDivisions] = useState<DivisionRecord[]>(initialDivisions);
     const [stats, setStats] = useState<StatsSummary>(initialStats);
@@ -101,6 +102,7 @@ export default function KelolaDivisiIndex({
     const [deletingDivisionId, setDeletingDivisionId] = useState<number | null>(null);
     const [editDivision, setEditDivision] = useState<DivisionRecord | null>(null);
     const [jobDivision, setJobDivision] = useState<DivisionRecord | null>(null);
+    const canManageDivisions = viewerRole !== 'Manager HC';
 
     const createForm = useForm<CreateDivisionFormFields>({
         name: '',
@@ -283,7 +285,7 @@ export default function KelolaDivisiIndex({
                 },
             );
             toast.success(
-                response.data?.flash?.success || 'Lowongan pekerjaan berhasil dibuka kembali.',
+                response.data?.flash?.success || 'Lowongan pekerjaan berhasil dipulihkan sebagai draft.',
             );
             await refreshData(
                 division.id.toString(),
@@ -361,7 +363,7 @@ export default function KelolaDivisiIndex({
                 setJobDivision(null);
                 jobForm.reset();
                 jobForm.clearErrors();
-                toast.success(responseData?.flash?.success || 'Lowongan pekerjaan berhasil dipublikasikan.');
+                toast.success(responseData?.flash?.success || 'Draft lowongan pekerjaan berhasil disimpan.');
                 await refreshData(
                     undefined,
                     'Lowongan tersimpan, tetapi data divisi terbaru gagal dimuat ulang.',
@@ -380,6 +382,99 @@ export default function KelolaDivisiIndex({
             },
         });
     };
+
+    const postWorkflowAction = useCallback(async (
+        division: DivisionRecord,
+        endpoint: string,
+        payload: Record<string, unknown>,
+        successMessage: string,
+        errorMessage: string,
+    ) => {
+        try {
+            const csrfToken = await ensureCsrfToken();
+            const response = await api.post(
+                apiUrl(`/super-admin/kelola-divisi/${division.id}/${endpoint}`),
+                payload,
+                {
+                    withCredentials: true,
+                    headers: buildCsrfHeaders(csrfToken),
+                },
+            );
+            toast.success(response.data?.flash?.success || successMessage);
+            await refreshData(
+                division.id.toString(),
+                'Status workflow lowongan berubah, tetapi data divisi terbaru gagal dimuat ulang.',
+            );
+        } catch (error) {
+            if (isAxiosError(error)) {
+                const payload = error.response?.data as any;
+                const message =
+                    payload?.errors?.job_id ||
+                    payload?.errors?.rejection_note ||
+                    payload?.errors?._form ||
+                    payload?.message;
+                toast.error(message || errorMessage);
+                return;
+            }
+            toast.error(errorMessage);
+        }
+    }, [refreshData]);
+
+    const submitApproval = useCallback((division: DivisionRecord, job: DivisionJob) => {
+        if (!job.id) {
+            toast.error('Simpan draft lowongan terlebih dahulu sebelum mengajukan approval.');
+            return;
+        }
+        void postWorkflowAction(
+            division,
+            'submit-job-approval',
+            { job_id: job.id },
+            'Lowongan berhasil diajukan untuk approval.',
+            'Gagal mengajukan approval lowongan.',
+        );
+    }, [postWorkflowAction]);
+
+    const publishJob = useCallback((division: DivisionRecord, job: DivisionJob) => {
+        if (!job.id) {
+            toast.error('ID lowongan tidak valid.');
+            return;
+        }
+        void postWorkflowAction(
+            division,
+            'publish-job',
+            { job_id: job.id },
+            'Lowongan berhasil dipublikasikan.',
+            'Gagal mempublikasikan lowongan.',
+        );
+    }, [postWorkflowAction]);
+
+    const approveJob = useCallback((division: DivisionRecord, job: DivisionJob) => {
+        if (!job.id) {
+            toast.error('ID lowongan tidak valid.');
+            return;
+        }
+        void postWorkflowAction(
+            division,
+            'approve-job',
+            { job_id: job.id },
+            'Lowongan berhasil disetujui.',
+            'Gagal menyetujui lowongan.',
+        );
+    }, [postWorkflowAction]);
+
+    const rejectJob = useCallback((division: DivisionRecord, job: DivisionJob, note: string) => {
+        if (!job.id) {
+            toast.error('ID lowongan tidak valid.');
+            return;
+        }
+        void postWorkflowAction(
+            division,
+            'reject-job',
+            { job_id: job.id, rejection_note: note },
+            'Lowongan berhasil ditolak.',
+            'Gagal menolak lowongan.',
+        );
+    }, [postWorkflowAction]);
 
     const closeJob = (division: DivisionRecord, jobId?: number | null) => {
         const baseRoute = route('super-admin.divisions.close-job', division.id);
@@ -451,7 +546,7 @@ export default function KelolaDivisiIndex({
             title="Kelola Divisi"
             description="Pantau kapasitas tim dan kelola lowongan tiap divisi"
             breadcrumbs={[
-                { label: 'Super Admin', href: route('super-admin.dashboard') },
+                { label: viewerRole === 'Manager HC' ? 'Manager HC' : 'Super Admin', href: route('super-admin.divisions.index') },
                 { label: 'Kelola Divisi' },
             ]}
         >
@@ -468,14 +563,16 @@ export default function KelolaDivisiIndex({
                                 Lihat kapasitas tim, detail staff, dan kelola lowongan pekerjaan.
                             </CardDescription>
                         </div>
-                        <button
-                            type="button"
-                            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 md:text-sm"
-                            onClick={openCreateDialog}
-                        >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Tambah Divisi
-                        </button>
+                        {canManageDivisions && (
+                            <button
+                                type="button"
+                                className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 md:text-sm"
+                                onClick={openCreateDialog}
+                            >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Tambah Divisi
+                            </button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
@@ -492,6 +589,10 @@ export default function KelolaDivisiIndex({
                             onOpenJobDialog={openJobDialog}
                             onReopenJob={reopenJob}
                             onCloseJob={closeJob}
+                            onSubmitApproval={submitApproval}
+                            onPublishJob={publishJob}
+                            onApproveJob={approveJob}
+                            onRejectJob={rejectJob}
                             onDeleteDivision={deleteDivision}
                             deletingDivisionId={deletingDivisionId}
                         />

@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"hris-backend/internal/http/middleware"
-	"hris-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -57,7 +56,7 @@ func (r *sqlNotificationsRepository) CountUnreadRecentAuditLogs(userID int64) (i
 
 func SuperAdminNotifications(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}

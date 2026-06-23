@@ -91,7 +91,7 @@ func TriggerAutomaticRecruitmentAIScreening(db *sqlx.DB, cfg config.Config, appl
 
 func SuperAdminRecruitmentGetAIScreening(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -118,7 +118,7 @@ func SuperAdminRecruitmentGetAIScreening(c *gin.Context) {
 
 func SuperAdminRecruitmentRunAIScreening(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}

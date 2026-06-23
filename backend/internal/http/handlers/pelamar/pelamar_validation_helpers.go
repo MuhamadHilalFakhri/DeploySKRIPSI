@@ -40,8 +40,8 @@ func validatePersonalRequired(profile *models.ApplicantProfile) handlers.FieldEr
 	if profile.DateOfBirth == nil {
 		errs["personal.date_of_birth"] = "Tanggal lahir wajib diisi."
 	} else {
-		today := time.Now().Truncate(24 * time.Hour)
-		if !profile.DateOfBirth.Before(today) {
+		today := handlers.StartOfDisplayDay(time.Now())
+		if !handlers.StartOfDisplayDay(*profile.DateOfBirth).Before(today) {
 			errs["personal.date_of_birth"] = "Tanggal lahir tidak boleh hari ini atau di masa depan."
 		}
 	}

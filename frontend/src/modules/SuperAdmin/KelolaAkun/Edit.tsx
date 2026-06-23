@@ -200,6 +200,7 @@ export default function Edit({
                 onSubmit={handleSubmit}
                 showDivision={showDivision}
                 showPasswordFields
+                registeredAtMin={user.registered_at ?? ''}
                 submitLabel="Perbarui Akun"
                 secondaryAction={
                     <ButtonLink href={returnURL}>

@@ -10,7 +10,6 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 	pelamarhandlers.RegisterRecruitmentAIScreeningTrigger(TriggerAutomaticRecruitmentAIScreening)
 
 	rg.GET("/super-admin/dashboard", SuperAdminDashboard)
-	rg.GET("/super-admin/admin-hr/dashboard", SuperAdminAdminHrDashboard)
 	rg.GET("/super-admin/notifications", SuperAdminNotifications)
 	rg.GET("/super-admin/audit-log", SuperAdminAuditLogsIndex)
 	rg.POST("/super-admin/audit-log/mark-viewed", SuperAdminAuditLogsMarkViewed)
@@ -37,6 +36,10 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 	rg.PATCH("/super-admin/kelola-divisi/:id", SuperAdminDivisionsUpdate)
 	rg.DELETE("/super-admin/kelola-divisi/:id", SuperAdminDivisionsDelete)
 	rg.POST("/super-admin/kelola-divisi/:id/open-job", SuperAdminDivisionsOpenJob)
+	rg.POST("/super-admin/kelola-divisi/:id/submit-job-approval", SuperAdminDivisionsSubmitJobApproval)
+	rg.POST("/super-admin/kelola-divisi/:id/approve-job", SuperAdminDivisionsApproveJob)
+	rg.POST("/super-admin/kelola-divisi/:id/reject-job", SuperAdminDivisionsRejectJob)
+	rg.POST("/super-admin/kelola-divisi/:id/publish-job", SuperAdminDivisionsPublishJob)
 	rg.DELETE("/super-admin/kelola-divisi/:id/open-job", SuperAdminDivisionsCloseJob)
 
 	rg.GET("/super-admin/kelola-surat", SuperAdminLettersIndex)

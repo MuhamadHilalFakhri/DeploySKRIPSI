@@ -355,13 +355,12 @@ func parseStaffDate(value string) (*time.Time, string) {
 	if trimmed == "" {
 		return nil, ""
 	}
-	parsed, err := time.Parse("2006-01-02", trimmed)
+	parsed, err := handlers.ParseDateStrictInDisplayLocation(trimmed, "2006-01-02")
 	if err != nil {
 		return nil, "Format tanggal lahir tidak valid."
 	}
-	now := time.Now()
-	if parsed.After(now) {
-		return nil, "Tanggal lahir tidak boleh di masa depan."
+	if !parsed.Before(handlers.StartOfDisplayDay(time.Now())) {
+		return nil, "Tanggal lahir tidak boleh hari ini atau di masa depan."
 	}
 	return &parsed, ""
 }

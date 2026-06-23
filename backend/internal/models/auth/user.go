@@ -1,9 +1,6 @@
 package authmodel
 
-import (
-	"strings"
-	"time"
-)
+import "time"
 
 type User struct {
 	ID              int64      `db:"id" json:"id"`
@@ -25,19 +22,37 @@ type User struct {
 
 const (
 	RoleSuperAdmin = "Super Admin"
+	RoleManagerHC  = "Manager HC"
 	RoleAdmin      = "Admin"
 	RoleStaff      = "Staff"
 	RolePelamar    = "Pelamar"
 )
 
-var UserRoles = []string{RoleSuperAdmin, RoleAdmin, RoleStaff, RolePelamar}
+var UserRoles = []string{RoleSuperAdmin, RoleManagerHC, RoleAdmin, RoleStaff, RolePelamar}
+var AssignableUserRoles = UserRoles
 
 var UserStatuses = []string{"Active", "Inactive"}
 
-func (u User) IsHumanCapitalAdmin() bool {
-	if u.Role != RoleAdmin || u.Division == nil {
-		return false
-	}
-	div := *u.Division
-	return strings.Contains(strings.ToLower(div), "human capital") || strings.Contains(strings.ToLower(div), "human resources")
+func (u User) IsManagerHC() bool {
+	return u.Role == RoleManagerHC
+}
+
+func (u User) CanAccessHumanCapitalOperations() bool {
+	return u.Role == RoleSuperAdmin
+}
+
+func (u User) CanAccessVacancyWorkflow() bool {
+	return u.Role == RoleSuperAdmin || u.IsManagerHC()
+}
+
+func (u User) CanEditVacancyDrafts() bool {
+	return u.Role == RoleSuperAdmin
+}
+
+func (u User) CanApproveVacancyWorkflow() bool {
+	return u.IsManagerHC()
+}
+
+func (u User) CanPublishApprovedVacancies() bool {
+	return u.Role == RoleSuperAdmin
 }

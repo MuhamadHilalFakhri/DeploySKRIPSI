@@ -1,4 +1,4 @@
-import { apiUrl, resolveAssetUrl } from './api';
+import { apiUrl, getBackendBaseUrl, resolveAssetUrl } from './api';
 
 describe('resolveAssetUrl', () => {
   it('returns null for empty values', () => {
@@ -20,5 +20,14 @@ describe('resolveAssetUrl', () => {
   it('normalizes csrf endpoints under /api', () => {
     expect(apiUrl('/csrf')).toContain('/api/csrf');
     expect(apiUrl('/api/csrf')).toContain('/api/csrf');
+  });
+
+  it('prefers NEXT_PUBLIC_BACKEND_ORIGIN for backend asset base', () => {
+    const previous = process.env.NEXT_PUBLIC_BACKEND_ORIGIN;
+    process.env.NEXT_PUBLIC_BACKEND_ORIGIN = 'https://backend.example.com/';
+
+    expect(getBackendBaseUrl()).toBe('https://backend.example.com');
+
+    process.env.NEXT_PUBLIC_BACKEND_ORIGIN = previous;
   });
 });

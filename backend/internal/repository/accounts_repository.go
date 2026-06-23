@@ -49,6 +49,7 @@ type UpdateUserInput struct {
 type UserRoleStats struct {
 	Total      int
 	SuperAdmin int
+	ManagerHC  int
 	Admin      int
 	Staff      int
 	Pelamar    int
@@ -110,6 +111,7 @@ func CountUsersByRoleStats(db *sqlx.DB) (UserRoleStats, error) {
 		SELECT
 			COUNT(*) AS total,
 			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_super_admin,
+			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_manager_hc,
 			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_admin,
 			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_staff,
 			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_pelamar
@@ -119,17 +121,19 @@ func CountUsersByRoleStats(db *sqlx.DB) (UserRoleStats, error) {
 	row := struct {
 		Total           int `db:"total"`
 		TotalSuperAdmin int `db:"total_super_admin"`
+		TotalManagerHC  int `db:"total_manager_hc"`
 		TotalAdmin      int `db:"total_admin"`
 		TotalStaff      int `db:"total_staff"`
 		TotalPelamar    int `db:"total_pelamar"`
 	}{}
 
-	if err := db.Get(&row, query, models.RoleSuperAdmin, models.RoleAdmin, models.RoleStaff, models.RolePelamar); err != nil {
+	if err := db.Get(&row, query, models.RoleSuperAdmin, models.RoleManagerHC, models.RoleAdmin, models.RoleStaff, models.RolePelamar); err != nil {
 		return out, wrapRepoErr("count users by role stats", err)
 	}
 
 	out.Total = row.Total
 	out.SuperAdmin = row.TotalSuperAdmin
+	out.ManagerHC = row.TotalManagerHC
 	out.Admin = row.TotalAdmin
 	out.Staff = row.TotalStaff
 	out.Pelamar = row.TotalPelamar

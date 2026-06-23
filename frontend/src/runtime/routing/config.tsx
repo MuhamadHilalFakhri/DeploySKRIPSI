@@ -2,6 +2,12 @@ import { lazy } from 'react';
 
 import type { RouteConfig } from '@/runtime/routing/types';
 import { usePageManager } from '@/shared/lib/inertia';
+import {
+  canAccessHumanCapitalOperations,
+  canAccessVacancyWorkflow,
+  isManagerHCRole,
+  isSuperAdminRole,
+} from '@/shared/lib/user-roles';
 
 const loadLandingPage = () => import('@/modules/LandingPage/Index');
 const loadLogin = () => import('@/modules/Auth/Login');
@@ -27,7 +33,6 @@ const loadAdminStaffLetters = () => import('@/modules/AdminStaff/Letters');
 const loadAdminStaffRecruitment = () => import('@/modules/AdminStaff/Recruitment');
 
 const loadSuperAdminDashboard = () => import('@/modules/SuperAdmin/Dashboard');
-const loadSuperAdminAdminHRDashboard = () => import('@/modules/SuperAdmin/AdminHR/Dashboard');
 const loadSuperAdminRecruitment = () => import('@/modules/SuperAdmin/KelolaRekrutmen/Index');
 const loadSuperAdminDivisions = () => import('@/modules/SuperAdmin/KelolaDivisi/Index');
 const loadSuperAdminLetters = () => import('@/modules/SuperAdmin/KelolaSurat/Index');
@@ -64,7 +69,6 @@ const AdminStaffLetters = lazy(loadAdminStaffLetters);
 const AdminStaffRecruitment = lazy(loadAdminStaffRecruitment);
 
 const SuperAdminDashboard = lazy(loadSuperAdminDashboard);
-const SuperAdminAdminHRDashboard = lazy(loadSuperAdminAdminHRDashboard);
 const SuperAdminRecruitment = lazy(loadSuperAdminRecruitment);
 const SuperAdminDivisions = lazy(loadSuperAdminDivisions);
 const SuperAdminLetters = lazy(loadSuperAdminLetters);
@@ -213,12 +217,6 @@ export const ROUTES: RouteConfig[] = [
     api: '/super-admin/dashboard',
   },
   {
-    path: '/super-admin/admin-hr/dashboard',
-    name: 'super-admin.admin-hr.dashboard',
-    component: SuperAdminAdminHRDashboard,
-    api: '/super-admin/admin-hr/dashboard',
-  },
-  {
     path: '/super-admin/recruitment',
     name: 'super-admin.recruitment',
     component: SuperAdminRecruitment,
@@ -280,14 +278,6 @@ export const ROUTES: RouteConfig[] = [
   },
 ];
 
-function isSuperAdminRole(role: unknown): boolean {
-  return role === 'SuperAdmin' || role === 'Super Admin';
-}
-
-function isHumanCapitalDivision(division: unknown): boolean {
-  return typeof division === 'string' && /human\s+(capital|resources)/i.test(division);
-}
-
 export function getWarmupLoaders(user: any): Array<() => Promise<unknown>> {
   const warmups: Array<() => Promise<unknown>> = [loadProfileEdit];
 
@@ -300,15 +290,11 @@ export function getWarmupLoaders(user: any): Array<() => Promise<unknown>> {
       loadSuperAdminStaff,
       loadSuperAdminAuditLog,
     );
+  } else if (isManagerHCRole(user.role)) {
+    warmups.push(loadSuperAdminDivisions);
   } else if (user.role === 'Admin') {
-    const isHumanCapitalAdmin = isHumanCapitalDivision(user.division);
-    if (isHumanCapitalAdmin) {
-      warmups.push(
-        loadSuperAdminAdminHRDashboard,
-        loadSuperAdminRecruitment,
-        loadSuperAdminLetters,
-        loadSuperAdminLetterTemplates,
-      );
+    if (canAccessHumanCapitalOperations(user)) {
+      warmups.push(loadSuperAdminDivisions);
     } else {
       warmups.push(loadAdminStaffDashboard, loadAdminStaffLetters, loadAdminStaffRecruitment);
     }
@@ -336,21 +322,13 @@ export function getWarmupApiEndpoints(user: any): string[] {
       '/super-admin/audit-log',
       '/super-admin/accounts',
     );
+  } else if (isManagerHCRole(user.role)) {
+    endpoints.push('/super-admin/kelola-divisi');
   } else if (user.role === 'Admin') {
-    if (isHumanCapitalDivision(user.division)) {
-      endpoints.push(
-        '/super-admin/admin-hr/dashboard',
-        '/super-admin/recruitment',
-        '/super-admin/kelola-divisi',
-        '/super-admin/kelola-surat',
-        '/super-admin/kelola-surat/templates',
-      );
+    if (canAccessVacancyWorkflow(user)) {
+      endpoints.push('/super-admin/kelola-divisi');
     } else {
-      endpoints.push(
-        '/admin-staff/dashboard',
-        '/admin-staff/kelola-surat',
-        '/admin-staff/recruitment',
-      );
+      endpoints.push('/admin-staff/dashboard', '/admin-staff/kelola-surat', '/admin-staff/recruitment');
     }
   } else if (user.role === 'Staff') {
     endpoints.push('/staff/dashboard', '/staff/keluhan-dan-saran', '/staff/pengajuan-resign');

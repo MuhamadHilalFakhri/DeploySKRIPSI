@@ -92,7 +92,7 @@ func PelamarProfileUpdate(c *gin.Context) {
 				if trimmed == "" {
 					profile.DateOfBirth = nil
 				} else {
-					t, err := time.Parse("2006-01-02", trimmed)
+					t, err := handlers.ParseDateStrictInDisplayLocation(trimmed, "2006-01-02")
 					if err != nil {
 						handlers.ValidationErrors(c, handlers.FieldErrors{
 							"personal.date_of_birth": "Format tanggal lahir tidak valid.",

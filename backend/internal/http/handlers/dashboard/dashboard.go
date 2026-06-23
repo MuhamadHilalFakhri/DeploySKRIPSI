@@ -31,12 +31,11 @@ func AdminDashboardPlaceholder(c *gin.Context) {
 }
 
 func dashboardPathFor(user models.User) string {
-	if user.IsHumanCapitalAdmin() {
-		return "/super-admin/admin-hr/dashboard"
-	}
 	switch user.Role {
 	case models.RoleSuperAdmin:
 		return "/super-admin/dashboard"
+	case models.RoleManagerHC:
+		return "/super-admin/kelola-divisi"
 	case models.RoleAdmin:
 		return "/admin-staff/dashboard"
 	case models.RoleStaff:

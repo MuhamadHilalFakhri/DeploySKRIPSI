@@ -67,7 +67,7 @@ export function buildTrackingSteps(letter: LetterRecord): TrackingStep[] {
   steps.push({
     id: 'created',
     status: 'Dibuat',
-    description: `Surat dibuat oleh ${letter.sender ?? 'pengirim tidak diketahui'} dan dikirim ke Admin HC.`,
+    description: `Surat dibuat oleh ${letter.sender ?? 'pengirim tidak diketahui'} dan dikirim ke Super Admin.`,
     location: letter.from ?? 'Internal',
     timestamp: creationTimestamp,
     person: letter.sender,
@@ -77,9 +77,9 @@ export function buildTrackingSteps(letter: LetterRecord): TrackingStep[] {
   if (hasProcessProgress) {
     steps.push({
       id: 'hr-received',
-      status: 'Diterima Admin HC',
-      description: 'Admin HC menerima surat dan menyiapkan disposisi ke divisi tujuan.',
-      location: 'Human Capital',
+      status: 'Diterima Super Admin',
+      description: 'Super Admin menerima surat dan menyiapkan disposisi ke divisi tujuan.',
+      location: 'Super Admin',
       timestamp: letter.approvalDate ?? firstReply?.timestamp ?? letter.disposedAt ?? undefined,
       person: letter.disposedBy,
       completed: true,
@@ -102,8 +102,8 @@ export function buildTrackingSteps(letter: LetterRecord): TrackingStep[] {
       status: 'Balasan Divisi',
       description: entry.note
         ? `Divisi ${entry.division ?? initialTargetDivision} membalas: ${entry.note}`
-        : `Divisi ${entry.division ?? initialTargetDivision} mengirim balasan ke Admin HC.`,
-      location: `${entry.division ?? initialTargetDivision} -> Human Capital`,
+        : `Divisi ${entry.division ?? initialTargetDivision} mengirim balasan ke Super Admin.`,
+      location: `${entry.division ?? initialTargetDivision} -> Super Admin`,
       timestamp: entry.timestamp ?? letter.replyAt ?? undefined,
       person: entry.author ?? letter.replyBy,
       completed: true,
@@ -113,9 +113,9 @@ export function buildTrackingSteps(letter: LetterRecord): TrackingStep[] {
   if (replyHistory.length > 0 && (isFinalized || isRejected || isArchived || isCompletedStatus || isClosed)) {
     steps.push({
       id: 'hr-after-reply',
-      status: 'Ditinjau Ulang Admin HC',
-      description: 'Admin HC meninjau balasan divisi untuk menentukan keputusan akhir.',
-      location: 'Human Capital',
+      status: 'Ditinjau Ulang Super Admin',
+      description: 'Super Admin meninjau balasan divisi untuk menentukan keputusan akhir.',
+      location: 'Super Admin',
       timestamp: letter.disposedAt ?? letter.updatedAt ?? undefined,
       person: letter.disposedBy,
       completed: true,

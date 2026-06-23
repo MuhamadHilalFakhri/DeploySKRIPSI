@@ -54,6 +54,9 @@ go run ./cmd/migrate up
 ```
 go run ./cmd/seed users
 ```
+   Seeder ini akan membuat atau memperbarui akun default:
+   - `superadmin@admin.com` / `password`
+   - `managerhc@admin.com` / `password`
    (Opsional) Jalankan seeder 20 data staff:
 ```
 go run ./cmd/seed staff

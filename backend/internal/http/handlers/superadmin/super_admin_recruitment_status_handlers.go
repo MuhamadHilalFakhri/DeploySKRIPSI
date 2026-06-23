@@ -116,7 +116,7 @@ func SuperAdminRecruitmentUpdateSLASettings(c *gin.Context) {
 
 func SuperAdminRecruitmentViewCV(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -226,7 +226,7 @@ func sanitizeRecruitmentCVApplicantName(name string) string {
 
 func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -323,7 +323,7 @@ func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
 
 func SuperAdminRecruitmentReject(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -393,7 +393,7 @@ func SuperAdminRecruitmentReject(c *gin.Context) {
 
 func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanAccessHumanCapitalOperations() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -468,30 +468,8 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 		return
 	}
 
-	dateVal, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"date": "Format tanggal tidak valid."})
-		return
-	}
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	if dateVal.Before(today) {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"date": "Tanggal interview tidak boleh di masa lalu."})
-		return
-	}
-
-	startTime, err := time.Parse("15:04", timeStart)
-	if err != nil {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"time": "Format waktu mulai tidak valid."})
-		return
-	}
-	endTime, err := time.Parse("15:04", timeEnd)
-	if err != nil {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"end_time": "Format waktu selesai tidak valid."})
-		return
-	}
-	if !endTime.After(startTime) {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"end_time": "Waktu selesai harus lebih besar dari waktu mulai."})
+	if validationErrors := validateInterviewScheduleDateTime(date, timeStart, timeEnd, time.Now()); len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 
@@ -590,6 +568,50 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 		"status":     "Jadwal interview berhasil disimpan.",
 		"email_sent": emailSent,
 	})
+}
+
+func validateInterviewScheduleDateTime(date string, timeStart string, timeEnd string, now time.Time) handlers.FieldErrors {
+	errs := handlers.FieldErrors{}
+
+	dateVal, err := handlers.ParseDateStrictInDisplayLocation(date, "2006-01-02")
+	if err != nil {
+		errs["date"] = "Format tanggal tidak valid."
+		return errs
+	}
+
+	startTime, err := time.Parse("15:04", timeStart)
+	if err != nil {
+		errs["time"] = "Format waktu mulai tidak valid."
+		return errs
+	}
+
+	endTime, err := time.Parse("15:04", timeEnd)
+	if err != nil {
+		errs["end_time"] = "Format waktu selesai tidak valid."
+		return errs
+	}
+	if !endTime.After(startTime) {
+		errs["end_time"] = "Waktu selesai harus lebih besar dari waktu mulai."
+		return errs
+	}
+
+	loc := handlers.DisplayLocation()
+	nowLocal := now.In(loc)
+	today := handlers.StartOfDay(nowLocal, loc)
+	if dateVal.Before(today) {
+		errs["date"] = "Tanggal interview tidak boleh di masa lalu."
+		return errs
+	}
+
+	if dateVal.Equal(today) {
+		currentMinutes := nowLocal.Hour()*60 + nowLocal.Minute()
+		startMinutes := startTime.Hour()*60 + startTime.Minute()
+		if startMinutes <= currentMinutes {
+			errs["time"] = "Waktu mulai interview harus di masa depan untuk jadwal hari ini."
+		}
+	}
+
+	return errs
 }
 
 type interviewScheduleEmailPayload struct {

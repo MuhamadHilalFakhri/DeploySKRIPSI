@@ -18,7 +18,7 @@ import (
 
 func SuperAdminDivisionsOpenJob(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanEditVacancyDrafts() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -107,7 +107,7 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		}
 		if existingJob.IsActive {
 			c.JSON(http.StatusOK, gin.H{
-				"flash": gin.H{"success": "Lowongan sudah aktif."},
+				"flash": gin.H{"success": "Lowongan draft sudah tersedia."},
 			})
 			return
 		}
@@ -116,7 +116,7 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			return
 		}
 		if err := dbrepo.ReactivateDivisionJob(db, divisionID, existingJob.ID, now); err != nil {
-			handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuka kembali lowongan. Coba lagi.")
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memulihkan lowongan. Coba lagi.")
 			return
 		}
 		syncDivisionProfilePrimaryJob(db, divisionID)
@@ -162,7 +162,7 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		})
 
 		c.JSON(http.StatusOK, gin.H{
-			"flash": gin.H{"success": "Lowongan pekerjaan berhasil dibuka kembali."},
+			"flash": gin.H{"success": "Lowongan pekerjaan dipulihkan sebagai draft."},
 		})
 		return
 	}
@@ -216,6 +216,7 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 	requirementsBytes, _ := json.Marshal(cleaned)
 
 	actionLabel := "menambahkan"
+	workflowStatus := "draft"
 	if req.JobID != nil {
 		if existingJob == nil {
 			handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
@@ -234,6 +235,7 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			JobEligibility:    string(criteriaBytes),
 			JobSalaryMin:      req.JobSalaryMin,
 			JobWorkMode:       &workMode,
+			WorkflowStatus:    workflowStatus,
 			Now:               now,
 		})
 		if err != nil {
@@ -242,12 +244,12 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		}
 		if !existingJob.IsActive {
 			if err := dbrepo.ReactivateDivisionJob(db, divisionID, *req.JobID, now); err != nil {
-				handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuka kembali lowongan. Coba lagi.")
+				handlers.JSONError(c, http.StatusInternalServerError, "Gagal memulihkan lowongan. Coba lagi.")
 				return
 			}
-			actionLabel = "membuka kembali"
+			actionLabel = "memulihkan draft"
 		} else {
-			actionLabel = "memperbarui"
+			actionLabel = "memperbarui draft"
 		}
 	} else {
 		if availableSlots <= 0 {
@@ -262,6 +264,7 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			JobEligibility:    string(criteriaBytes),
 			JobSalaryMin:      req.JobSalaryMin,
 			JobWorkMode:       &workMode,
+			WorkflowStatus:    workflowStatus,
 			Now:               now,
 		})
 		if err != nil {
@@ -269,8 +272,6 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			return
 		}
 	}
-
-	syncDivisionProfilePrimaryJob(db, divisionID)
 
 	criteriaForAudit := map[string]any{}
 	for key, value := range criteria {
@@ -315,11 +316,13 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 
 	message := "Lowongan pekerjaan berhasil dipublikasikan."
 	if req.JobID != nil {
-		if actionLabel == "membuka kembali" {
-			message = "Lowongan pekerjaan berhasil dibuka kembali."
+		if actionLabel == "memulihkan draft" {
+			message = "Lowongan pekerjaan berhasil dipulihkan sebagai draft."
 		} else {
-			message = "Lowongan pekerjaan berhasil diperbarui."
+			message = "Draft lowongan pekerjaan berhasil diperbarui."
 		}
+	} else {
+		message = "Draft lowongan pekerjaan berhasil disimpan."
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"flash": gin.H{"success": message},
@@ -343,9 +346,271 @@ func normalizeJobWorkMode(value string) string {
 	}
 }
 
+func vacancyJobIDFromRequest(c *gin.Context) *int64 {
+	req := vacancyWorkflowRequestFromRequest(c)
+	if req.JobID != nil && *req.JobID > 0 {
+		return req.JobID
+	}
+	if raw := strings.TrimSpace(c.Query("job_id")); raw != "" {
+		if parsedID, err := strconv.ParseInt(raw, 10, 64); err == nil && parsedID > 0 {
+			return &parsedID
+		}
+	}
+	if raw := strings.TrimSpace(c.PostForm("job_id")); raw != "" {
+		if parsedID, err := strconv.ParseInt(raw, 10, 64); err == nil && parsedID > 0 {
+			return &parsedID
+		}
+	}
+	return nil
+}
+
+func vacancyWorkflowRequestFromRequest(c *gin.Context) VacancyWorkflowRequest {
+	var req VacancyWorkflowRequest
+	contentType := strings.ToLower(c.ContentType())
+
+	if strings.Contains(contentType, "json") {
+		_ = c.ShouldBindJSON(&req)
+	} else {
+		_ = c.ShouldBind(&req)
+	}
+
+	if req.JobID == nil {
+		if raw := strings.TrimSpace(c.Query("job_id")); raw != "" {
+			if parsedID, err := strconv.ParseInt(raw, 10, 64); err == nil && parsedID > 0 {
+				req.JobID = &parsedID
+			}
+		}
+	}
+	if req.JobID == nil {
+		if raw := strings.TrimSpace(c.PostForm("job_id")); raw != "" {
+			if parsedID, err := strconv.ParseInt(raw, 10, 64); err == nil && parsedID > 0 {
+				req.JobID = &parsedID
+			}
+		}
+	}
+
+	req.RejectionNote = strings.TrimSpace(req.RejectionNote)
+	if req.RejectionNote == "" {
+		req.RejectionNote = strings.TrimSpace(c.PostForm("rejection_note"))
+	}
+
+	return req
+}
+
+func SuperAdminDivisionsSubmitJobApproval(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !user.CanEditVacancyDrafts() {
+		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	divisionID, parseErr := strconv.ParseInt(c.Param("id"), 10, 64)
+	if parseErr != nil || divisionID <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID divisi tidak valid")
+		return
+	}
+	workflowReq := vacancyWorkflowRequestFromRequest(c)
+	jobID := workflowReq.JobID
+	if jobID == nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Lowongan wajib dipilih."})
+		return
+	}
+
+	db := middleware.GetDB(c)
+	job, err := dbrepo.GetDivisionJobByID(db, *jobID, divisionID)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lowongan")
+		return
+	}
+	if job == nil || !job.IsActive {
+		handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+		return
+	}
+	if strings.TrimSpace(job.WorkflowStatus) == "pending_approval" {
+		c.JSON(http.StatusOK, gin.H{"flash": gin.H{"success": "Lowongan sudah menunggu approval."}})
+		return
+	}
+	if strings.TrimSpace(job.WorkflowStatus) == "published" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Lowongan yang sudah publish tidak dapat diajukan ulang."})
+		return
+	}
+
+	if err := dbrepo.UpdateDivisionJobWorkflowStatus(db, dbrepo.DivisionJobWorkflowUpdateInput{
+		ID:                *jobID,
+		DivisionProfileID: divisionID,
+		WorkflowStatus:    "pending_approval",
+		ActorUserID:       user.ID,
+		Now:               time.Now(),
+	}); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal mengajukan approval lowongan")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"flash": gin.H{"success": "Lowongan berhasil diajukan untuk approval."}})
+}
+
+func SuperAdminDivisionsApproveJob(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !user.CanApproveVacancyWorkflow() {
+		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	divisionID, parseErr := strconv.ParseInt(c.Param("id"), 10, 64)
+	if parseErr != nil || divisionID <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID divisi tidak valid")
+		return
+	}
+	workflowReq := vacancyWorkflowRequestFromRequest(c)
+	jobID := workflowReq.JobID
+	if jobID == nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Lowongan wajib dipilih."})
+		return
+	}
+
+	db := middleware.GetDB(c)
+	job, err := dbrepo.GetDivisionJobByID(db, *jobID, divisionID)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lowongan")
+		return
+	}
+	if job == nil || !job.IsActive {
+		handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+		return
+	}
+	if strings.TrimSpace(job.WorkflowStatus) != "pending_approval" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Hanya lowongan yang menunggu approval yang dapat disetujui."})
+		return
+	}
+	if job.SubmittedBy != nil && *job.SubmittedBy == user.ID {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Pengaju lowongan tidak boleh menyetujui lowongannya sendiri."})
+		return
+	}
+
+	if err := dbrepo.UpdateDivisionJobWorkflowStatus(db, dbrepo.DivisionJobWorkflowUpdateInput{
+		ID:                *jobID,
+		DivisionProfileID: divisionID,
+		WorkflowStatus:    "approved",
+		ActorUserID:       user.ID,
+		Now:               time.Now(),
+	}); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyetujui lowongan")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"flash": gin.H{"success": "Lowongan berhasil disetujui."}})
+}
+
+func SuperAdminDivisionsRejectJob(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !user.CanApproveVacancyWorkflow() {
+		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	divisionID, parseErr := strconv.ParseInt(c.Param("id"), 10, 64)
+	if parseErr != nil || divisionID <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID divisi tidak valid")
+		return
+	}
+	workflowReq := vacancyWorkflowRequestFromRequest(c)
+	jobID := workflowReq.JobID
+	if jobID == nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Lowongan wajib dipilih."})
+		return
+	}
+	rejectionNote := workflowReq.RejectionNote
+	if rejectionNote == "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"rejection_note": "Catatan penolakan wajib diisi."})
+		return
+	}
+
+	db := middleware.GetDB(c)
+	job, err := dbrepo.GetDivisionJobByID(db, *jobID, divisionID)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lowongan")
+		return
+	}
+	if job == nil || !job.IsActive {
+		handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+		return
+	}
+	if strings.TrimSpace(job.WorkflowStatus) != "pending_approval" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Hanya lowongan yang menunggu approval yang dapat ditolak."})
+		return
+	}
+	if job.SubmittedBy != nil && *job.SubmittedBy == user.ID {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Pengaju lowongan tidak boleh menolak lowongannya sendiri."})
+		return
+	}
+
+	if err := dbrepo.UpdateDivisionJobWorkflowStatus(db, dbrepo.DivisionJobWorkflowUpdateInput{
+		ID:                *jobID,
+		DivisionProfileID: divisionID,
+		WorkflowStatus:    "rejected",
+		ActorUserID:       user.ID,
+		RejectionNote:     &rejectionNote,
+		Now:               time.Now(),
+	}); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menolak lowongan")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"flash": gin.H{"success": "Lowongan berhasil ditolak."}})
+}
+
+func SuperAdminDivisionsPublishJob(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !user.CanPublishApprovedVacancies() {
+		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	divisionID, parseErr := strconv.ParseInt(c.Param("id"), 10, 64)
+	if parseErr != nil || divisionID <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID divisi tidak valid")
+		return
+	}
+	workflowReq := vacancyWorkflowRequestFromRequest(c)
+	jobID := workflowReq.JobID
+	if jobID == nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Lowongan wajib dipilih."})
+		return
+	}
+
+	db := middleware.GetDB(c)
+	job, err := dbrepo.GetDivisionJobByID(db, *jobID, divisionID)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lowongan")
+		return
+	}
+	if job == nil || !job.IsActive {
+		handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+		return
+	}
+	if strings.TrimSpace(job.WorkflowStatus) != "approved" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"job_id": "Hanya lowongan yang sudah disetujui yang dapat dipublikasikan."})
+		return
+	}
+
+	if err := dbrepo.UpdateDivisionJobWorkflowStatus(db, dbrepo.DivisionJobWorkflowUpdateInput{
+		ID:                *jobID,
+		DivisionProfileID: divisionID,
+		WorkflowStatus:    "published",
+		ActorUserID:       user.ID,
+		Now:               time.Now(),
+	}); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal mempublikasikan lowongan")
+		return
+	}
+	syncDivisionProfilePrimaryJob(db, divisionID)
+
+	c.JSON(http.StatusOK, gin.H{"flash": gin.H{"success": "Lowongan berhasil dipublikasikan."}})
+}
+
 func SuperAdminDivisionsCloseJob(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+	if user == nil || !user.CanEditVacancyDrafts() {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
@@ -480,6 +745,16 @@ func loadDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[int64][
 			"job_work_mode":            row.JobWorkMode,
 			"job_requirements":         handlers.DecodeJSONStringArray(row.JobRequirements),
 			"job_eligibility_criteria": handlers.DecodeJSONMap(row.JobEligibility),
+			"workflow_status":          row.WorkflowStatus,
+			"submitted_by":             row.SubmittedBy,
+			"submitted_at":             row.SubmittedAt,
+			"approved_by":              row.ApprovedBy,
+			"approved_at":              row.ApprovedAt,
+			"rejected_by":              row.RejectedBy,
+			"rejected_at":              row.RejectedAt,
+			"rejection_note":           row.RejectionNote,
+			"published_by":             row.PublishedBy,
+			"published_at":             row.PublishedAt,
 			"is_active":                row.IsActive,
 			"opened_at":                row.OpenedAt,
 			"closed_at":                row.ClosedAt,
@@ -603,6 +878,7 @@ func loadClosedDivisionJobsFromAuditByDivisionIDs(db *sqlx.DB, divisionIDs []int
 			"job_work_mode":            jobWorkModePtr,
 			"job_requirements":         requirements,
 			"job_eligibility_criteria": eligibility,
+			"workflow_status":          "closed",
 			"is_active":                false,
 			"opened_at":                nil,
 			"closed_at":                row.CreatedAt,
@@ -681,7 +957,7 @@ func syncDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64) {
 	}
 
 	now := time.Now()
-	primary, err := dbrepo.GetPrimaryActiveDivisionJob(db, divisionID)
+	primary, err := dbrepo.GetPrimaryPublishedDivisionJob(db, divisionID)
 	if err != nil {
 		return
 	}

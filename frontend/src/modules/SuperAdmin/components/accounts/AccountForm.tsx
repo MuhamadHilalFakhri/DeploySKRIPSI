@@ -1,6 +1,7 @@
 ﻿import { FormEvent } from 'react';
 
 import PasswordRequirementChecklist from '@/shared/components/PasswordRequirementChecklist';
+import { getLocalDateInputValue } from '@/shared/lib/date';
 import {
     normalizePersonName,
     sanitizePersonNameInput,
@@ -38,6 +39,7 @@ interface AccountFormProps {
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
     showDivision: boolean;
     showPasswordFields: boolean;
+    registeredAtMin?: string;
     submitLabel: string;
     secondaryAction?: React.ReactNode;
 }
@@ -56,14 +58,19 @@ export default function AccountForm({
     onSubmit,
     showDivision,
     showPasswordFields,
+    registeredAtMin,
     submitLabel,
     secondaryAction,
 }: AccountFormProps) {
+    const availableRoleOptions = data.role && !roleOptions.includes(data.role)
+        ? [...roleOptions, data.role]
+        : roleOptions;
     const filteredRoleOptions =
         data.role === 'Super Admin'
-            ? roleOptions
-            : roleOptions.filter((role) => role !== 'Super Admin');
+            ? availableRoleOptions
+            : availableRoleOptions.filter((role) => role !== 'Super Admin');
     const isStaffRole = data.role === 'Staff';
+    const inactiveDateMin = data.registered_at || registeredAtMin || undefined;
 
     const handleStatusChange = (nextStatus: string) => {
         setData('status', nextStatus);
@@ -71,7 +78,7 @@ export default function AccountForm({
         if (nextStatus === 'Inactive') {
             const value = data.inactive_at && data.inactive_at.length > 0
                 ? data.inactive_at
-                : new Date().toISOString().split('T')[0];
+                : getLocalDateInputValue();
             setData('inactive_at', value);
             return;
         }
@@ -332,6 +339,7 @@ export default function AccountForm({
                         onChange={(event) =>
                             setData('inactive_at', event.target.value)
                         }
+                        min={inactiveDateMin}
                         disabled={data.status !== 'Inactive'}
                         className={`mt-2 h-11 w-full rounded-lg border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
                             data.status !== 'Inactive'
@@ -362,11 +370,27 @@ export default function AccountForm({
                         id="registered_at"
                         type="date"
                         value={data.registered_at ?? ''}
-                        onChange={(e) =>
-                            setData('registered_at', e.target.value)
-                        }
+                        onChange={(e) => {
+                            const nextRegisteredAt = e.target.value;
+                            setData('registered_at', nextRegisteredAt);
+                            if (
+                                data.status === 'Inactive' &&
+                                data.inactive_at &&
+                                nextRegisteredAt &&
+                                data.inactive_at < nextRegisteredAt
+                            ) {
+                                setData('inactive_at', nextRegisteredAt);
+                            }
+                        }}
+                        min={registeredAtMin || undefined}
+                        required
                         className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     />
+                    {registeredAtMin && (
+                        <p className="mt-1 text-xs text-slate-500">
+                            Tanggal terdaftar tidak bisa lebih awal dari {registeredAtMin}
+                        </p>
+                    )}
                     {errors.registered_at && (
                         <p className="mt-1 text-xs text-red-500">
                             {errors.registered_at}
